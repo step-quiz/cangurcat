@@ -13,10 +13,22 @@
   const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
 
   // ---- Estat de la UI ----
-  let state = null; // estat de la sessió (Tutor.newSessionState)
+  let state = null; // estat del PROBLEMA actual (Tutor.newSessionState)
   let busy = false; // bloqueja accions mentre s'espera la IA
   let busyLabel = "";
   let draftMessage = ""; // preserva el text escrit entre re-renders
+
+  // ---- Estat de la SESSIÓ (acumula tots els problemes d'un mateix
+  //      curs+convocatòria, per generar el codi de verificació) ----
+  //   session = {
+  //     curs, any, startedTs,
+  //     problems: { [numero]: {answered, solved, solveCommits, hints} }
+  //   }
+  // S'inicia quan s'obre el primer problema i es REINICIA en canviar de
+  // curs o de convocatòria. Veure codi.js per al format del codi.
+  let session = null;
+  let sessionFinished = false; // mostra el panell "Prova finalitzada"
+  let lastCode = null; // { code, metrics } del darrer codi generat
 
   // Filtres del selector
   let selCurs = "1ESO";
@@ -64,11 +76,156 @@
   }
 
   // ============================================================
+  // SESSIÓ (acumulació entre problemes + codi de verificació)
+  // ============================================================
+
+  // Crea una sessió nova si no n'hi ha cap, o si el problema pertany a un
+  // curs/convocatòria diferents (llavors es reinicia). El rellotge de la
+  // sessió arrenca quan s'obre el PRIMER problema (= "entrar a la sessió").
+  function ensureSession(problem) {
+    if (
+      !session ||
+      session.curs !== problem.categoria ||
+      session.any !== problem.any
+    ) {
+      session = {
+        curs: problem.categoria,
+        any: problem.any,
+        startedTs: Date.now() / 1000,
+        problems: {},
+      };
+      sessionFinished = false;
+      lastCode = null;
+    }
+  }
+
+  // Fusiona un registre previ amb l'estat viu d'un problema. "answered" i
+  // "solved" són enganxosos (un cop certs, ho continuen sent) i les pistes
+  // es queden amb el màxim; així, reobrir un problema dins la mateixa sessió
+  // no fa perdre un encert ni el recompte de pistes (cas lineal: exacte).
+  function mergeProblem(prev, st) {
+    const base = prev || {
+      answered: false,
+      solved: false,
+      solveCommits: null,
+      hints: 0,
+    };
+    const nCommits = (st.commit_attempts || []).length;
+    const solvedNow = st.verdict_final === "solved";
+    return {
+      answered: base.answered || nCommits > 0,
+      solved: base.solved || solvedNow,
+      solveCommits:
+        base.solveCommits != null
+          ? base.solveCommits
+          : solvedNow
+          ? nCommits
+          : null,
+      hints: Math.max(base.hints || 0, st.pistes_count || 0),
+    };
+  }
+
+  // Persisteix el problema obert ACTUAL dins la sessió (abans de canviar de
+  // problema o en finalitzar). Només si pertany al curs/any de la sessió.
+  function recordCurrentProblem() {
+    if (!session || !state) return;
+    const p = state.problem;
+    if (!p || p.categoria !== session.curs || p.any !== session.any) return;
+    session.problems[p.numero] = mergeProblem(
+      session.problems[p.numero],
+      state
+    );
+  }
+
+  // Totals VIUS de la sessió (no muta res): fusiona els problemes ja
+  // registrats amb el problema obert actual, perquè els comptadors es vegin
+  // sempre al dia. Retorna també el mapa de problemes per generar el codi.
+  function sessionTotals() {
+    const merged = {};
+    if (session) {
+      for (const n in session.problems) {
+        merged[n] = Object.assign({}, session.problems[n]);
+      }
+      if (state) {
+        const p = state.problem;
+        if (p && p.categoria === session.curs && p.any === session.any) {
+          merged[p.numero] = mergeProblem(merged[p.numero], state);
+        }
+      }
+    }
+    let answered = 0,
+      solved = 0,
+      hints = 0;
+    for (const k in merged) {
+      const r = merged[k];
+      if (r.answered) answered++;
+      if (r.solved) solved++;
+      hints += r.hints || 0;
+    }
+    return { answered, solved, errors: answered - solved, hints, problems: merged };
+  }
+
+  function humanitzeDur(sec) {
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${h} h ${m} min ${s} s`;
+    if (m > 0) return `${m} min ${s} s`;
+    return `${s} s`;
+  }
+
+  // Calcula i congela el codi de verificació de la sessió.
+  function finishSession() {
+    if (!session) return;
+    recordCurrentProblem(); // assegura el problema obert
+    const totals = sessionTotals();
+    lastCode = window.Codi.generate({
+      curs: session.curs,
+      any: session.any,
+      problems: totals.problems,
+      durationSec: Date.now() / 1000 - session.startedTs,
+    });
+    sessionFinished = true;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function continuePractice() {
+    sessionFinished = false; // conserva la sessió; pot seguir i regenerar
+    lastCode = null;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function newSession() {
+    session = null;
+    state = null;
+    sessionFinished = false;
+    lastCode = null;
+    draftMessage = "";
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ============================================================
   // RENDER
   // ============================================================
   function render() {
+    // Panell final "Prova finalitzada" (substitueix tota la vista).
+    if (sessionFinished && lastCode) {
+      root.innerHTML =
+        `<h1 class="app-title">🦘 Prova Cangur</h1>` + renderFinishedPanel();
+      return;
+    }
+
     const parts = [];
     parts.push(`<h1 class="app-title">🦘 Prova Cangur</h1>`);
+
+    // Barra de sessió (apareix quan hi ha una sessió en curs).
+    if (session) {
+      parts.push(renderSessionBar());
+    }
 
     if (!state) {
       parts.push(`
@@ -90,6 +247,68 @@
     const ta = root.querySelector('[data-role="message-input"]');
     if (ta) ta.value = draftMessage;
   }
+
+  // Barra superior de progrés de la sessió + botó per finalitzar i obtenir
+  // el codi. Sempre visible mentre s'està practicant.
+  function renderSessionBar() {
+    const t = sessionTotals();
+    const cursLabel =
+      (window.Codi.CURS_LABEL && window.Codi.CURS_LABEL[session.curs]) ||
+      session.curs;
+    const dur = humanitzeDur(Date.now() / 1000 - session.startedTs);
+    return `
+      <div class="session-bar">
+        <div class="sb-info">
+          <span class="sb-title">Sessió en curs</span>
+          <span class="sb-ctx">${esc(cursLabel)} · convocatòria ${session.any}</span>
+        </div>
+        <div class="sb-stats">
+          <span class="sb-chip"><strong>${t.answered}</strong> respostes</span>
+          <span class="sb-chip sb-ok"><strong>${t.solved}</strong> encerts</span>
+          <span class="sb-chip sb-err"><strong>${t.errors}</strong> errors</span>
+          <span class="sb-chip"><strong>${t.hints}</strong> pistes</span>
+          <span class="sb-chip sb-time">⏱ ${dur}</span>
+        </div>
+        <button class="btn btn-finish" data-action="finish-session" title="Genera el codi per lliurar al professorat">
+          🏁 Finalitzar i obtenir el codi
+        </button>
+      </div>`;
+  }
+
+  // Panell "Prova finalitzada": resum + codi copiable (com a Competències
+  // Bàsiques) + opcions per seguir practicant o començar de nou.
+  function renderFinishedPanel() {
+    const m = lastCode.metrics;
+    const dur = humanitzeDur(m.durationSec);
+    return `
+      <section class="finished-panel">
+        <div class="finished-title">🎉 Prova finalitzada</div>
+        <p class="finished-sub">Has completat la pràctica de:
+          <strong>${esc(m.cursLabel)}</strong> · convocatòria <strong>${m.any}</strong></p>
+
+        <div class="finished-stats">
+          <div class="fs-item"><div class="fs-num">${m.answered}</div><div class="fs-lbl">respostes</div></div>
+          <div class="fs-item"><div class="fs-num fs-ok">${m.solved}</div><div class="fs-lbl">encerts</div></div>
+          <div class="fs-item"><div class="fs-num fs-err">${m.errors}</div><div class="fs-lbl">errors</div></div>
+          <div class="fs-item"><div class="fs-num">${m.hints}</div><div class="fs-lbl">pistes</div></div>
+          <div class="fs-item"><div class="fs-num">${dur}</div><div class="fs-lbl">durada</div></div>
+        </div>
+
+        <div class="code-box">
+          <p class="code-box-label">Copia el codi i lliura'l al professor:</p>
+          <button class="code-btn" data-action="copy-code" data-code="${esc(
+            lastCode.code
+          )}">${esc(lastCode.code)}</button>
+          <div class="copied-msg" data-role="copied-msg">Copiat! ✅</div>
+        </div>
+
+        <div class="finished-actions">
+          <button class="btn btn-continue" data-action="continue-practice">↩︎ Seguir practicant</button>
+          <button class="btn btn-newsession" data-action="new-session">🔄 Començar una sessió nova</button>
+        </div>
+      </section>`;
+  }
+
 
   function renderSelector() {
     const open = !state ? "open" : "";
@@ -442,7 +661,12 @@
   function startProblem(pid) {
     if (!pid) return;
     try {
+      // Desa el problema que estàvem fent dins la sessió actual (si escau)
+      // ABANS de substituir l'estat pel nou problema.
+      recordCurrentProblem();
       state = T.newSessionState(pid);
+      // Crea/continua/reinicia la sessió segons el curs+convocatòria.
+      ensureSession(state.problem);
       draftMessage = "";
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -497,6 +721,40 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // Copia el codi de verificació al porta-retalls amb feedback visual.
+  function copyCode(btn, code) {
+    const done = () => {
+      btn.classList.add("copied");
+      const msg = btn.parentElement.querySelector('[data-role="copied-msg"]');
+      if (msg) msg.classList.add("show");
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        if (msg) msg.classList.remove("show");
+      }, 2500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done, () => fallbackCopy(code, done));
+    } else {
+      fallbackCopy(code, done);
+    }
+  }
+
+  function fallbackCopy(text, done) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      done();
+    } catch (e) {
+      /* sense porta-retalls: l'alumne pot seleccionar i copiar manualment */
+    }
+    ta.remove();
+  }
+
   // ============================================================
   // ESDEVENIMENTS (delegació)
   // ============================================================
@@ -540,6 +798,14 @@
       doSend();
     } else if (action === "download-trace") {
       downloadTrace();
+    } else if (action === "finish-session") {
+      finishSession();
+    } else if (action === "copy-code") {
+      copyCode(el, el.dataset.code);
+    } else if (action === "continue-practice") {
+      continuePractice();
+    } else if (action === "new-session") {
+      newSession();
     }
   });
 

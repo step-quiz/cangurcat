@@ -150,3 +150,76 @@ reactivar.
 > blancs de cada imatge. Aquí es mostra la imatge sencera (més robust amb
 > 480 imatges diferents). Es pot tornar a afegir al `build_static.py` si
 > es vol.
+
+---
+
+## Codi de verificació i lliurament (Google Form)
+
+En acabar la pràctica, l'alumne prem **🏁 Finalitzar i obtenir el codi** i
+obté un **codi compacte** que copia i lliura mitjançant un **Google Form
+autenticat** (domini educatiu). Així, aquest lloc estàtic **no gestiona ni
+desa cap dada personal**: la privacitat queda sota la responsabilitat del
+Google Form. És el mateix patró que el projecte de Competències Bàsiques.
+
+La lògica del codi viu a `js/codi.js` (font única de l'especificació, que
+**genera i descodifica** el codi amb la mateixa funció de control).
+
+### Format del codi (`CG`, 10 segments)
+
+```
+{L}{salt}-{DDMM}-{HHMM}-CG-{curs}-{QQ}-{AA}-{PP}-{TTTTT}-{R(30)}
+```
+
+| Camp     | Significat                                                            |
+| -------- | --------------------------------------------------------------------- |
+| `L`      | lletra de control (checksum tipus DNI, alfabet de 23 lletres)         |
+| `salt`   | `cursChar` + 2 últimes xifres de la **convocatòria** (a=1ESO…d=4ESO)  |
+| `DDMM`   | dia i mes reals de generació del codi                                 |
+| `HHMM`   | hora i minut reals de generació del codi                              |
+| `CG`     | codi d'exercici (**C**an**G**ur)                                      |
+| `curs`   | 1–4 (1ESO–4ESO; redundant amb el salt, però llegible)                 |
+| `QQ`     | nombre de problemes **respostos** (amb almenys un commit)             |
+| `AA`     | nombre d'**encerts** (resolts)                                        |
+| `PP`     | nombre de **pistes** demanades en total                               |
+| `TTTTT`  | **durada** de la sessió en segons (del 1r problema obert → codi)      |
+| `R`      | 30 xifres, una per problema (índex = `numero`−1 dins el curs/any)     |
+
+Codificació de cada xifra de `R`: `0` = no respost · `1`–`8` = resolt al
+N-è commit (`1` = a la primera) · `9` = respost però no resolt. Els
+**errors** són `QQ − AA` (= nombre de `9` a `R`).
+
+> El checksum es calcula sobre `QQ+AA+PP+curs+dd+mm+hh+min+salt[0]` (mòdul
+> 23). Igual que a Competències Bàsiques, **no cobreix la cadena `R`**; per
+> això l'analitzador fa una **verificació creuada** addicional (comprova
+> que els comptadors `QQ`/`AA` quadrin amb el detall per problema de `R`) i
+> marca com a invàlid qualsevol codi manipulat.
+
+### Acumulació de la sessió
+
+La sessió **acumula tots els problemes d'un mateix curs + convocatòria**. El
+rellotge arrenca quan s'obre el primer problema. Si l'alumne **canvia de
+curs o de convocatòria**, la sessió es **reinicia**. Després de generar el
+codi pot **seguir practicant** i tornar-lo a generar (s'actualitza), o
+**començar una sessió nova**. Reobrir un problema ja fet no fa perdre
+l'encert: un cop resolt, queda resolt.
+
+---
+
+## Analitzador (professorat) — `analitzador-cangur.html`
+
+Eina **independent** i autònoma (un sol fitxer HTML, s'obre al navegador
+sense servidor) per llegir el **CSV/TSV** que el Google Form ha bolcat amb
+les respostes. Mostra una taula amb una fila per lliurament:
+
+- **Estat** (✅ vàlid · ⚠️ sospitós · ❌ invàlid), **Dia** i **Hora** d'enviament, **Alumne**.
+- **Curs**, **Convocatòria**, **Respostes**, **Encerts**, **Errors**, **Pistes**, **Durada**.
+- **Δt**: minuts entre la generació del codi i l'enviament del formulari (senyal antifrau; ⚠️ si supera 15 min).
+- **Resultats**: tira de 30 cel·les amb el detall per problema (desplega la fila per veure-la amb el número d'intent).
+
+Filtres per alumne, curs, convocatòria, dia i estat; estadístiques
+agregades; i **exportació** d'un CSV de resum. Cada fila es valida amb el
+checksum **i** amb la verificació creuada de `R`.
+
+> Es manté com a eina **separada** de l'analitzador de Competències
+> Bàsiques (que té llicència CC BY-NC-ND i columnes diferents). La lògica de
+> descodificació del codi és idèntica a `js/codi.js`, per garantir paritat.
