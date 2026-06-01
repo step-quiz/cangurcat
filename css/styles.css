@@ -1273,6 +1273,13 @@ details.trace > summary:focus-visible {
     padding-right: max(0.8rem, env(safe-area-inset-right));
   }
 
+  /* La imatge de l'enunciat pot usar bona part de l'alçada disponible
+     (sense títol, en horitzontal hi ha marge per fer-la gran). */
+  .header-image img,
+  body.ai-on .header-image img {
+    max-height: 70vh;
+  }
+
   /* Barra compacta sempre visible amb el botó hamburguesa. */
   .topchrome .burger-bar {
     display: flex;
@@ -1368,19 +1375,54 @@ details.trace > summary:focus-visible {
     display: none;
   }
 
-  /* ---- Targeta del problema a tota l'amplada ----
-     En horitzontal amaguem les fletxes laterals « » (es pot navegar des del
-     menú i amb el botó "problema següent"); així la targeta de l'enunciat
-     ocupa el 100% de l'amplada del viewport, sense marges morts. */
+  /* ---- Targeta del problema a tota l'amplada, amb fletxes flotants ----
+     Les fletxes « » NO s'amaguen: se superposen flotant a les vores de la
+     targeta (no ocupen amplada de columna), de manera que la bombolla de
+     l'enunciat ocupa el 100% del viewport i la imatge es veu el més gran
+     possible. Les fletxes queden per damunt, semitransparents i centrades. */
   .problem-nav-row {
+    position: relative;
     gap: 0;
+    display: block; /* el panell ja no comparteix fila amb les fletxes */
   }
-  .problem-nav-row .nav-arrow {
-    display: none;
+  .problem-nav-row .problem-panel {
+    width: 100%;
   }
   .problem-panel {
     padding-left: 0;
     padding-right: 0;
+  }
+
+  /* Fletxes superposades a les vores, sense robar amplada. */
+  .problem-nav-row .nav-arrow {
+    display: flex;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 40;
+    width: 2.1rem;
+    min-height: 2.8rem;
+    margin: 0;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1.5px solid #cbd5e1;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    font-size: 1.05rem;
+    backdrop-filter: blur(2px);
+  }
+  .problem-nav-row .nav-arrow.nav-prev {
+    left: 0.2rem;
+  }
+  .problem-nav-row .nav-arrow.nav-next {
+    right: 0.2rem;
+  }
+  .problem-nav-row .nav-arrow:active:not(:disabled) {
+    background: var(--blue-accent);
+    border-color: #000;
+    color: #fff;
+    transform: translateY(-50%) scale(0.95);
+  }
+  .problem-nav-row .nav-arrow:disabled {
+    opacity: 0.25;
   }
 
   /* ---- Botó "Menú" més petit (guanya alçada vertical) ---- */
