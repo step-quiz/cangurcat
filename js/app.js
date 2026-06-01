@@ -277,7 +277,6 @@
   // Bàsiques) + opcions per seguir practicant o començar de nou.
   function renderFinishedPanel() {
     const m = lastCode.metrics;
-    const dur = humanitzeDur(m.durationSec);
     return `
       <section class="finished-panel">
         <div class="finished-title">🎉 Prova finalitzada</div>
@@ -286,18 +285,22 @@
 
         <div class="finished-stats">
           <div class="fs-item"><div class="fs-num">${m.answered}</div><div class="fs-lbl">respostes</div></div>
-          <div class="fs-item"><div class="fs-num fs-ok">${m.solved}</div><div class="fs-lbl">encerts</div></div>
-          <div class="fs-item"><div class="fs-num fs-err">${m.errors}</div><div class="fs-lbl">errors</div></div>
+          <div class="fs-item"><div class="fs-num">${m.solved}</div><div class="fs-lbl">encerts</div></div>
+          <div class="fs-item"><div class="fs-num">${m.errors}</div><div class="fs-lbl">errors</div></div>
           <div class="fs-item"><div class="fs-num">${m.hints}</div><div class="fs-lbl">pistes</div></div>
-          <div class="fs-item"><div class="fs-num">${dur}</div><div class="fs-lbl">durada</div></div>
         </div>
 
         <div class="code-box">
-          <p class="code-box-label">Copia el codi i lliura'l al professor:</p>
+          <p class="code-box-label">Clica damunt del codi següent:</p>
           <button class="code-btn" data-action="copy-code" data-code="${esc(
             lastCode.code
           )}">${esc(lastCode.code)}</button>
           <div class="copied-msg" data-role="copied-msg">Copiat! ✅</div>
+        </div>
+
+        <div class="forms-box" data-role="forms-box" style="display:none">
+          <p class="forms-box-label">Clica l'enllaç següent per obrir el Google Forms:</p>
+          <a class="btn btn-forms" href="https://docs.google.com/forms/d/e/1FAIpQLSfGul0XzwH_SiJ8Vr8kOe_J5pHNFCohSk1tW1dpz8GZuB7f_Q/viewform" target="_blank" rel="noopener noreferrer">Enquesta</a>
         </div>
 
         <div class="finished-actions">
@@ -407,8 +410,13 @@
     const problemPanel = renderProblemPanel();
     const sidePanel = AI_ON ? renderDialoguePanel() : renderAiOffExtras();
 
-    let trailing = `<hr class="divider"/>${renderHistoryExpander()}`;
-    if (DEBUG) trailing += renderDebugState();
+    // El rastre d'events queda reservat al mode debug (?debug=1); l'alumne
+    // no l'ha de veure. La funcionalitat es manté intacta (renderHistoryExpander).
+    let trailing = "";
+    if (DEBUG) {
+      trailing += `<hr class="divider"/>${renderHistoryExpander()}`;
+      trailing += renderDebugState();
+    }
 
     return `<div class="layout">${problemPanel}${sidePanel}</div>${trailing}`;
   }
@@ -500,13 +508,15 @@
   // Panell dret amb IA: fil de xat + flash + input/resum
   function renderDialoguePanel() {
     const verdict = state.verdict_final;
+    // Un cop resolt, s'amaguen les pistes del fil (són soroll); la resta
+    // del diàleg es conserva.
     let html = `<section class="dialogue-panel">
       <h3 class="dialeg-title">Diàleg</h3>
-      ${renderConversation()}
+      ${renderConversation({ hideHints: verdict !== null })}
       ${renderFlash({ exclude: "commit_ok" })}`;
 
     if (verdict !== null) {
-      html += `<hr class="divider"/>${renderTraceExpander()}`;
+      if (DEBUG) html += `<hr class="divider"/>${renderTraceExpander()}`;
     } else if (state.mode === "reasoning") {
       const remaining = T.messagesRemaining(state);
       html += `
@@ -529,9 +539,12 @@
   function renderAiOffExtras() {
     const verdict = state.verdict_final;
     let html = `<section class="dialogue-panel">`;
-    html += renderHintsOnly();
+    // Un cop resolt, la pista ja és soroll: no es mostra.
+    if (verdict === null) {
+      html += renderHintsOnly();
+    }
     html += renderFlash({ exclude: "commit_ok" });
-    if (verdict !== null) {
+    if (verdict !== null && DEBUG) {
       html += `<hr class="divider"/>${renderTraceExpander()}`;
     }
     html += `</section>`;
@@ -555,7 +568,7 @@
       .join("");
   }
 
-  function renderConversation() {
+  function renderConversation({ hideHints = false } = {}) {
     const history = state.conversation_history || [];
     if (!history.length) {
       return `<div class="chat-empty">Encara no heu començat a dialogar.</div>`;
@@ -573,6 +586,7 @@
       const kind = turn.kind || "message";
       const content = formatMd(turn.content);
       if (kind === "hint") {
+        if (hideHints) continue; // resolt: la pista és soroll
         const badge = turn.source === "catalog" ? "📘" : "💡";
         const anchor = hi === lastHintIdx ? ' data-role="last-hint"' : "";
         html += `<div class="chat-hint"${anchor}><strong>${badge}</strong><br/>${content}</div>`;
@@ -742,6 +756,11 @@
 
   // Copia el codi de verificació al porta-retalls amb feedback visual.
   function copyCode(btn, code) {
+    // En clicar el codi, mostra la bombolla amb l'enllaç al Google Forms.
+    // (Es revela sempre, encara que la còpia al porta-retalls falli.)
+    const fb = root.querySelector('[data-role="forms-box"]');
+    if (fb) fb.style.display = "";
+
     const done = () => {
       btn.classList.add("copied");
       const msg = btn.parentElement.querySelector('[data-role="copied-msg"]');
