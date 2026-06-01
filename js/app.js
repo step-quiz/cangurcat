@@ -497,6 +497,8 @@
       <button class="nav-arrow nav-next" data-action="nav-next" ${nextPid ? `data-pid="${esc(nextPid)}"` : "disabled"} title="Problema següent">»</button>
     </div>`;
   }
+
+  function renderEliminationCard() {
     const eliminated = new Set(state.eliminated_options || []);
     const chips = T.VALID_LETTERS.map((letter) => {
       const cls = eliminated.has(letter)
