@@ -191,12 +191,16 @@ hr.turn-separator {
   font-family: var(--font-body);
   font-size: 0.95rem;
   padding: 0.32rem 0.85rem;
+  /* Alçada/àrea mínima tàctil perquè els filtres es premin bé amb el dit. */
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
   border-radius: 999px;
   border: 1px solid var(--chip-border);
   background: #fff;
   color: #374151;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.04s;
 }
 .pill:hover {
   border-color: #9ca3af;
@@ -221,6 +225,7 @@ select.problem-select {
   font-family: var(--font-body);
   font-size: 1rem;
   padding: 0.55rem 0.7rem;
+  min-height: 2.75rem;
   border: 1px solid var(--chip-border);
   border-radius: 8px;
   background: #fff;
@@ -240,11 +245,14 @@ button {
   font-size: 1rem;
   font-weight: 600;
   padding: 0.6rem 1rem;
+  /* Alçada mínima tàctil (≈44px): la mateixa norma a tots els botons
+     perquè es puguin prémer amb el dit en Chromebooks tàctils i mòbils. */
+  min-height: 2.75rem;
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, border-width 0.15s,
-    color 0.15s;
+    color 0.15s, transform 0.04s;
 }
 .btn:disabled {
   opacity: 0.45;
@@ -436,8 +444,9 @@ body.ai-on .header-image img {
   border-color: var(--blue-soft);
   color: var(--ink);
   font-weight: 700;
-  min-width: 3rem;
-  font-size: 1.05rem;
+  min-width: 3.25rem;
+  min-height: 3.25rem;
+  font-size: 1.15rem;
 }
 .btn-letter:hover:not(:disabled) {
   background: var(--blue-strong);
@@ -910,5 +919,242 @@ pre.trace-json {
   .session-bar .btn-finish {
     margin-left: 0;
     width: 100%;
+  }
+}
+
+/* ============================================================
+   MILLORES UX MULTIDISPOSITIU
+   (afegit: accessibilitat de teclat, tàctil sense hover,
+   i ajustos fins per a mòbil i Chromebook)
+   ============================================================ */
+
+/* ---- 1) Focus de teclat visible (Chromebook amb teclat, navegació amb Tab) ----
+   Abans no hi havia cap indicador de focus; ara cada element interactiu
+   mostra un anell clar només quan s'arriba per teclat (:focus-visible),
+   sense embrutar el clic de ratolí/dit. */
+.btn:focus-visible,
+.pill:focus-visible,
+.nav-arrow:focus-visible,
+.code-btn:focus-visible,
+.code-box a:focus-visible,
+select.problem-select:focus-visible,
+.message-form textarea:focus-visible,
+.selector > summary:focus-visible,
+details.trace > summary:focus-visible {
+  outline: 3px solid var(--blue-accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+/* El camp de text ja té vora pròpia: hi reforcem el focus amb un halo. */
+.message-form textarea:focus-visible {
+  outline-offset: 0;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+}
+
+/* ---- 2) Dispositius TÀCTILS sense hover fiable (Chromebook tàctil, mòbil) ----
+   Tota la UI donava retorn només amb :hover, que en pantalla tàctil no
+   existeix o queda "enganxat" després del toc. Aquí donem un retorn
+   immediat en prémer (:active) i suprimim qualsevol dependència del hover. */
+@media (hover: none) {
+  /* Retorn de pressió uniforme: el botó s'enfonsa lleugerament en tocar-lo. */
+  .btn:active:not(:disabled),
+  .pill:active,
+  .nav-arrow:active:not(:disabled),
+  .code-btn:active {
+    transform: translateY(1px) scale(0.985);
+  }
+
+  /* Estats "premut" amb color, perquè el toc es noti sense hover. */
+  .btn-hint:active:not(:disabled) {
+    background: var(--hint-btn-hover);
+    border-color: #000;
+    color: #000;
+  }
+  .btn-commit-enter:active:not(:disabled),
+  .btn-finish:active:not(:disabled) {
+    background: var(--commit-enter-btn-hover);
+    border-color: #000;
+    color: #000;
+  }
+  .btn-letter:active:not(:disabled),
+  .btn-send:active:not(:disabled),
+  .btn-continue:active:not(:disabled) {
+    background: var(--blue-strong);
+    border-color: #000;
+    color: #000;
+  }
+  .btn-cancel:active:not(:disabled),
+  .btn-newsession:active:not(:disabled),
+  .btn-download:active:not(:disabled) {
+    background: var(--gray-strong);
+    border-color: #000;
+    color: #000;
+  }
+  .btn-start:active:not(:disabled),
+  .btn-next:active:not(:disabled) {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #fff;
+  }
+  .pill:active {
+    border-color: #9ca3af;
+  }
+  .nav-arrow:active:not(:disabled) {
+    background: var(--blue-accent);
+    border-color: #000;
+    color: #fff;
+  }
+
+  /* En tàctil, no deixem que el :hover canviï el gruix de la vora (provoca
+     "salts" de layout i estats enganxats després del toc). */
+  .pill:hover,
+  .btn:hover,
+  .nav-arrow:hover {
+    border-width: 1px;
+  }
+}
+
+/* En dispositius híbrids (Chromebook tàctil + trackpad) el hover SÍ existeix
+   via trackpad; el bloc de dalt no s'hi aplica i es manté el hover ric. */
+
+/* ---- 3a) Tauletes i pantalles mitjanes-estretes (≤ 700px) ----
+   El trencament principal (880px) ja passa a una columna; aquí ajustem
+   marges i densitat perquè l'espai vertical es destini al contingut. */
+@media (max-width: 700px) {
+  .app {
+    padding: 0.8rem 1rem 3rem;
+  }
+  body.ai-off .app {
+    max-width: 100%;
+  }
+  .app-title {
+    font-size: 1.35rem;
+  }
+  /* Imatge de l'enunciat: a mòbil/tauleta pot ocupar més alçada útil. */
+  .header-image img,
+  body.ai-on .header-image img {
+    max-height: 56vh;
+  }
+  /* Les fletxes de navegació, més estretes per no robar amplada al problema. */
+  .nav-arrow {
+    width: 2.1rem;
+    font-size: 1rem;
+  }
+  .problem-nav-row {
+    gap: 0.35rem;
+  }
+}
+
+/* ---- 3b) Mòbil estret (≤ 520px) ----
+   Apilem les files de dues columnes, ampliem àrees tàctils i evitem
+   desbordaments del codi de verificació. */
+@media (max-width: 520px) {
+  .app {
+    padding: 0.7rem 0.8rem 2.5rem;
+  }
+
+  /* Barra de sessió: títol a dalt, botó a sota a amplada completa. */
+  .session-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .session-bar .btn-finish {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  /* Botons d'acció (pista / ja tinc la resposta): un sota l'altre,
+     a amplada completa, més fàcils d'encertar amb el polze. */
+  .action-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Lletres A–E: graella de 5 columnes iguals que omple l'amplada,
+     amb àrea tàctil generosa. */
+  .commit-letters {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.4rem;
+  }
+  .btn-letter {
+    min-width: 0;
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Bombolles de xat: aprofiten gairebé tota l'amplada (els marges del
+     15% es mengen massa pantalla en mòbil). */
+  .chat-user {
+    margin-left: 8%;
+    max-width: 92%;
+  }
+  .chat-ai,
+  .chat-hint {
+    margin-right: 8%;
+    max-width: 92%;
+  }
+  .chat-system {
+    margin: 0.5rem 6%;
+  }
+
+  /* Targeta d'opcions A–E: que les etiquetes flueixin sense desbordar. */
+  .opcions-card .label-row {
+    margin-right: 0.4rem;
+    margin-bottom: 0.3rem;
+  }
+
+  /* Codi de verificació: tipografia que no desbordi en pantalla petita. */
+  .code-box {
+    padding: 1rem 0.9rem;
+  }
+  .code-btn {
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 0.7rem;
+  }
+  .finished-title {
+    font-size: 1.4rem;
+  }
+
+  /* Mètriques finals: dues per fila perquè els números es llegeixin grans. */
+  .finished-stats {
+    gap: 0.5rem;
+  }
+  .fs-item {
+    min-width: 0;
+    flex: 1 1 calc(50% - 0.5rem);
+  }
+
+  /* Accions finals a amplada completa, una sota l'altra. */
+  .finished-actions {
+    flex-direction: column;
+  }
+  .finished-actions .btn {
+    width: 100%;
+  }
+}
+
+/* ---- 3c) Mòbil molt estret (≤ 360px) ----
+   Marge de seguretat per a dispositius petits: evita que la graella de
+   lletres quedi massa atapeïda. */
+@media (max-width: 360px) {
+  .commit-letters {
+    gap: 0.3rem;
+  }
+  .btn-letter {
+    font-size: 1.05rem;
+  }
+  .code-btn {
+    font-size: 0.9rem;
+  }
+}
+
+/* ---- 4) Respecte per qui prefereix menys moviment ---- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
