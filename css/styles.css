@@ -95,6 +95,28 @@ body.ai-off .app {
   gap: 0.5rem;
 }
 
+/* Subtítol de benvinguda: línia compacta sota el títol (substitueix la
+   caixa gran .welcome). Apareix només mentre no s'ha obert cap problema. */
+.app-subtitle {
+  margin: -0.4rem 0 1rem;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.45;
+  max-width: 70ch;
+}
+.app-subtitle strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+/* Per defecte (escriptori i mòbil vertical) es mostra la redacció estàndard;
+   la variant per a horitzontal queda amagada fins al media query corresponent. */
+.app-subtitle .subtitle-landscape {
+  display: none;
+}
+.app-subtitle .subtitle-default {
+  display: inline;
+}
+
 .problem-title {
   font-family: var(--font-display);
   font-size: 1.15rem;
@@ -1213,6 +1235,35 @@ details.trace > summary:focus-visible {
   /* Treu el títol i la seva icona: en horitzontal l'espai vertical és or. */
   .topchrome .app-title {
     display: none;
+  }
+
+  /* Ordena la capçalera: primer la barra hamburguesa, després el subtítol
+     de benvinguda (el cos plegable se situa a part, com a desplegable). */
+  .topchrome {
+    display: flex;
+    flex-direction: column;
+  }
+  .topchrome .burger-bar {
+    order: 1;
+  }
+  .topchrome .app-subtitle {
+    order: 2;
+  }
+  .topchrome .topchrome-body {
+    order: 3;
+  }
+
+  /* Subtítol més compacte i amb la redacció pròpia d'horitzontal
+     (demana desplegar el menú de la dreta en comptes de "aquí sota"). */
+  .topchrome .app-subtitle {
+    margin: 0.1rem 0 0;
+    font-size: 0.92rem;
+  }
+  .app-subtitle .subtitle-default {
+    display: none;
+  }
+  .app-subtitle .subtitle-landscape {
+    display: inline;
   }
 
   /* Aprofita tota l'amplada i respecta el notch lateral (viewport-fit). */

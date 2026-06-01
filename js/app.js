@@ -244,18 +244,11 @@
     // res: és un banner fix que conviu amb tot el contingut.
     parts.push(renderOrientationHint());
 
-    // Capçalera reagrupable: títol + barra de sessió + selector. En mòbil
-    // horitzontal es plega dins una hamburguesa per deixar l'enunciat
-    // visible de seguida; a la resta de mides es mostra tal com sempre.
+    // Capçalera reagrupable: títol + subtítol de benvinguda + barra de
+    // sessió + selector. En mòbil horitzontal es plega dins una hamburguesa
+    // per deixar l'enunciat visible de seguida; a la resta de mides es
+    // mostra tal com sempre.
     parts.push(renderTopChrome());
-
-    if (!state) {
-      parts.push(`
-        <div class="welcome">
-          👋 Et donem la benvinguda a la pràctica de Prova Cangur.<br/><br/>
-          Tria un problema aquí sota i prem <strong>🎯 Inicia el problema</strong>.
-        </div>`);
-    }
 
     if (state) {
       parts.push(renderSession());
@@ -282,14 +275,25 @@
     const sessionBar = session ? renderSessionBar() : "";
     const selector = renderSelector();
 
-    // Etiqueta compacta per a la barra hamburguesa (context mínim visible
-    // quan el menú està plegat): curs/convocatòria si hi ha sessió.
-    let burgerCtx = "Menú";
+    // Subtítol de benvinguda (només quan encara no s'ha obert cap problema).
+    // Conté dues redaccions: el CSS mostra la que correspon al dispositiu
+    // (escriptori/vertical vs. mòbil horitzontal amb hamburguesa).
+    const subtitle = !state
+      ? `<p class="app-subtitle">
+           <span class="subtitle-default">👋 Et donem la benvinguda a la pràctica de Prova Cangur. Tria un problema aquí sota i prem <strong>🎯 Inicia el problema</strong>.</span>
+           <span class="subtitle-landscape">👋 Et donem la benvinguda a la pràctica de Prova Cangur. Desplega el menú de la dreta, tria un problema i prem <strong>🎯 Inicia el problema</strong>.</span>
+         </p>`
+      : "";
+
+    // Context compacte de la barra hamburguesa (només mòbil horitzontal):
+    // si hi ha sessió, curs + convocatòria; si no, només la icona (sense la
+    // paraula "Menú", que ja la mostra el botó de la dreta).
+    let burgerCtx = "";
     if (session) {
       const cursLabel =
         (window.Codi.CURS_LABEL && window.Codi.CURS_LABEL[session.curs]) ||
         session.curs;
-      burgerCtx = `${cursLabel} · ${session.any}`;
+      burgerCtx = ` ${cursLabel} · ${session.any}`;
     }
 
     const openAttr = menuOpen ? "true" : "false";
@@ -297,8 +301,9 @@
     return `
       <div class="topchrome" data-open="${openAttr}" data-role="topchrome">
         <h1 class="app-title">🦘 Prova Cangur</h1>
+        ${subtitle}
         <div class="burger-bar">
-          <span class="burger-ctx">🦘 ${esc(burgerCtx)}</span>
+          <span class="burger-ctx">🦘${esc(burgerCtx)}</span>
           <button class="burger-btn" data-action="toggle-menu"
             aria-expanded="${openAttr}" aria-label="Obre o tanca el menú">
             <span class="burger-icon">${menuOpen ? "✕" : "☰"}</span>
