@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Analitzador Cangur 🦘</title>
+<style>
+:root{
+  --bg:#f1f5f9; --surface:#fff; --surface2:#f8fafc; --border:#e2e8f0; --border-h:#cbd5e1;
+  --text:#0f172a; --muted:#64748b; --accent:#2563eb;
+  --ok:#16a34a; --warn:#d97706; --danger:#dc2626;
+  /* Resultats per problema: 0 no respost, 1 a la 1a, 2-8 amb intents, 9 fallit */
+  --r0:#e2e8f0; --r1:#22c55e; --r2:#a3e635; --r3:#facc15; --r4:#fb923c;
+  --r5:#fb923c; --r6:#f97316; --r7:#f97316; --r8:#ef4444cc; --r9:#dc2626;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:13.5px;min-height:100vh;}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+.header h1{font-size:14px;font-weight:700;margin:0;}
+.header h1 span{color:var(--accent);}
+.header .sub{font-size:11px;color:var(--muted);margin-left:4px;}
+.header-right{display:flex;gap:8px;margin-left:auto;}
+.btn{font-family:inherit;font-size:13px;border-radius:7px;border:1px solid transparent;padding:7px 14px;cursor:pointer;transition:.15s;}
+.btn-primary{background:#cbd5e1;color:var(--text);}
+.btn-primary:hover{background:#94a3b8;color:#fff;}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text);background:var(--surface2);}
+
+/* ---- Zona de càrrega ---- */
+.upload-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 48px);gap:20px;padding:32px;}
+.dropzone{border:1.5px dashed var(--border-h);border-radius:12px;padding:34px 50px;text-align:center;cursor:pointer;transition:.2s;background:var(--surface);max-width:460px;width:100%;}
+.dropzone:hover,.dropzone.dragover{border-color:var(--accent);background:#eff6ff;}
+.dropzone-icon{font-size:38px;margin-bottom:8px;}
+.sep{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:10px;max-width:460px;width:100%;}
+.sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--border);}
+.paste-area{width:100%;max-width:460px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:12px;font-family:monospace;min-height:76px;resize:vertical;outline:none;}
+.intro{max-width:460px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.5;}
+
+/* ---- Vista principal ---- */
+.main{display:none;}
+.main.visible{display:block;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.stat-pills{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.sp{font-size:12.5px;color:var(--muted);}
+.sp strong{font-size:14px;color:var(--text);}
+.sp strong.ok{color:var(--ok);}.sp strong.warn{color:var(--warn);}.sp strong.danger{color:var(--danger);}
+.sp-sep{width:1px;height:18px;background:var(--border);}
+.filterbar{background:var(--bg);border-bottom:1px solid var(--border);padding:7px 18px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.fl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.fi{font-family:inherit;font-size:12.5px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);}
+.count{margin-left:auto;font-size:12px;color:var(--muted);}
+
+.table-wrap{overflow-x:auto;padding:0 6px 40px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{position:sticky;top:0;background:var(--surface2);text-align:left;padding:8px 9px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border);white-space:nowrap;z-index:2;}
+tbody td{padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tbody tr:hover{background:var(--surface2);cursor:pointer;}
+tr.row-exp{background:#eff6ff!important;}
+.tm{font-variant-numeric:tabular-nums;color:var(--text);}
+.mu{color:var(--muted);}
+.c-center{text-align:center;}
+.exp-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 5px;}
+.exp-btn.open{color:var(--accent);}
+
+/* Punts de resultat (petits, a la fila) */
+.rdots{display:flex;gap:2px;align-items:center;flex-wrap:wrap;}
+.rd{width:9px;height:9px;border-radius:2px;}
+
+/* Detall expandit */
+.det-row td{background:#f8fafc;}
+.det-panel{padding:12px 14px;position:relative;}
+.det-code{font-family:monospace;font-size:12px;background:#0f172a;color:#e2e8f0;padding:7px 10px;border-radius:6px;word-break:break-all;margin-bottom:11px;}
+.det-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+.det-item{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:6px 11px;min-width:90px;}
+.dk{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+.dv{font-size:13.5px;font-weight:600;color:var(--text);margin-top:1px;}
+.det-qgrid{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.qcell{width:30px;height:30px;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;line-height:1;}
+.qcell .qn{font-size:8px;font-weight:600;opacity:.85;}
+.qcell.q0{background:var(--r0);color:#94a3b8;}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;}
+.li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);}
+.ld{width:12px;height:12px;border-radius:3px;}
+.empty-state{text-align:center;color:var(--muted);padding:60px 20px;font-size:15px;}
+.warn-note{color:var(--danger);font-size:11.5px;margin-top:8px;font-weight:600;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:var(--border-h);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Analitzador <span>Cangur</span> 🦘</h1>
+  <span class="sub">codis "CG" · lliuraments per Google Form</span>
+  <div class="header-right" id="hdr-right" style="display:none">
+    <button class="btn btn-ghost" onclick="resetView()">← Nou arxiu</button>
+    <button class="btn btn-ghost" onclick="exportSummary()">⬇ Exportar resum</button>
+  </div>
+</div>
+
+<div class="upload-zone" id="upload-zone">
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon" onclick="document.getElementById('fi').click()" style="cursor:pointer" title="Obre un CSV">📂</div>
+    <button class="btn btn-primary" onclick="document.getElementById('fi').click()">Obre un arxiu CSV</button>
+    <input type="file" id="fi" accept=".csv,.txt,.tsv" style="display:none" onchange="handleFile(this.files[0])">
+  </div>
+  <div class="sep">o enganxa el contingut directament</div>
+  <textarea class="paste-area" id="paste-area" placeholder="Enganxa aquí el contingut del full de càlcul (Ctrl+A, Ctrl+C des de Google Sheets)…"></textarea>
+  <button class="btn btn-primary" onclick="handlePaste()">Analitzar</button>
+  <div class="intro">
+    Carrega el CSV/TSV que el Google Form ha bolcat amb les respostes de
+    l'alumnat. Cada fila ha de tenir, com a mínim, una columna amb el
+    <strong>codi</strong>, el <strong>correu</strong> i la
+    <strong>marca de temps</strong>. Les dades no surten del teu navegador.
+  </div>
+</div>
+
+<div class="main" id="main-view">
+  <div class="topbar">
+    <div class="stat-pills" id="stat-pills"></div>
+  </div>
+  <div class="filterbar">
+    <span class="fl">Alumne</span>
+    <select class="fi" id="f-stu" onchange="applyFilters()" style="width:160px"><option value="">Tots</option></select>
+    <span class="fl">Curs</span>
+    <select class="fi" id="f-curs" onchange="applyFilters()" style="width:110px"><option value="">Tots</option></select>
+    <span class="fl">Convocatòria</span>
+    <select class="fi" id="f-any" onchange="applyFilters()" style="width:110px"><option value="">Totes</option></select>
+    <span class="fl">Dia</span>
+    <input class="fi" id="f-date" type="date" onchange="applyFilters()" style="width:140px">
+    <span class="fl">Estat</span>
+    <select class="fi" id="f-sta" onchange="applyFilters()" style="width:120px">
+      <option value="">Tots</option>
+      <option value="ok">✅ Vàlid</option>
+      <option value="warn">⚠️ Sospitós</option>
+      <option value="invalid">❌ Invàlid</option>
+    </select>
+    <button class="btn btn-ghost" style="font-size:12px;padding:4px 9px" onclick="clearFilters()">Netejar</button>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th></th><th>Dia</th><th>Hora</th><th>Alumne</th><th></th>
+        <th>Curs</th><th>Convoc.</th>
+        <th title="Problemes respostos (amb commit)">Resp.</th>
+        <th title="Encerts">Enc.</th>
+        <th title="Errors (respostos i no resolts)">Err.</th>
+        <th title="Pistes demanades">Pist.</th>
+        <th title="Durada de la sessió">Durada</th>
+        <th title="Minuts entre generar el codi i enviar el formulari">Δt</th>
+        <th>Resultats</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty-state" id="empty" style="display:none">🔍 Cap resultat amb els filtres actuals</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Descodificació del codi "CG" — IDÈNTICA a web/js/codi.js
+   (es manté inline perquè l'analitzador sigui autònom).
+   Format (10 segments):
+   {L}{salt}-{DDMM}-{HHMM}-CG-{curs}-{QQ}-{AA}-{PP}-{TTTTT}-{R(30)}
+   ============================================================ */
+const LC = "TRWAGMYFPDXBNJZSQVHLCKE", GAP = 15;
+const CHAR_CURS = { a:"1ESO", b:"2ESO", c:"3ESO", d:"4ESO" };
+const CURS_LABEL = { "1ESO":"1r ESO","2ESO":"2n ESO","3ESO":"3r ESO","4ESO":"4t ESO" };
+const CURS_NUM = { "1ESO":1,"2ESO":2,"3ESO":3,"4ESO":4 };
+
+function chkCG(ltr, qq, aa, pp, cnum, dd, mm, hh, mn, saltChar0) {
+  const suma = qq + aa + pp + cnum + dd + mm + hh + mn + saltChar0;
+  return LC.charAt(suma % 23) === ltr;
+}
+
+function parseCG(raw) {
+  if (!raw || !raw.trim()) return { format:"empty", valid:false, error:"Buit" };
+  const code = raw.trim(), p = code.split("-");
+  const ok10 =
+    p.length === 10 &&
+    /^[A-Z][a-d]\d{2}$/.test(p[0]) &&
+    /^\d{4}$/.test(p[1]) && /^\d{4}$/.test(p[2]) &&
+    p[3] === "CG" && /^[1-4]$/.test(p[4]) &&
+    /^\d{2}$/.test(p[5]) && /^\d{2}$/.test(p[6]) &&
+    /^\d{2}$/.test(p[7]) && /^\d{5}$/.test(p[8]) &&
+    /^[0-9]{30}$/.test(p[9]);
+  if (!ok10) {
+    return { format:"unknown", valid:false, checksumOk:false, error:"Format desconegut (no és un codi CG)" };
+  }
+  const ltr = p[0][0], salt = p[0].slice(1), cursChar = salt[0], any2 = salt.slice(1);
+  const dd = +p[1].slice(0,2), mm = +p[1].slice(2,4), hh = +p[2].slice(0,2), mn = +p[2].slice(2,4);
+  const cnum = +p[4], qq = +p[5], aa = +p[6], pp = +p[7], dur = +p[8];
+  const results = p[9];
+  const checksumOk = chkCG(ltr, qq, aa, pp, cnum, dd, mm, hh, mn, salt.charCodeAt(0));
+  const resultsArray = results.split("").map(Number);
+
+  // Verificació creuada: els comptadors han de coincidir amb la cadena R.
+  const answeredR = resultsArray.filter(v => v >= 1 && v <= 9).length;
+  const solvedR = resultsArray.filter(v => v >= 1 && v <= 8).length;
+  const crossOk = answeredR === qq && solvedR === aa;
+
+  return {
+    format:"cg", valid: checksumOk && crossOk, checksumOk, crossOk,
+    curs: CHAR_CURS[cursChar] || null,
+    cursLabel: CURS_LABEL[CHAR_CURS[cursChar]] || null,
+    any: /^\d{2}$/.test(any2) ? "20" + any2 : null,
+    answered: qq, solved: aa, errors: qq - aa, hints: pp, durationSec: dur,
+    results, resultsArray,
+    day: dd, month: mm, hour: hh, minute: mn,
+    error: !checksumOk ? "Checksum invàlid"
+          : !crossOk ? "Incoherència: els comptadors no quadren amb el detall per problema"
+          : null,
+  };
+}
+
+/* ============================================================
+   Ingesta del CSV/TSV (detecció de columnes robusta)
+   ============================================================ */
+function csvLine(l, sep) {
+  const r = []; let c = "", q = false;
+  for (const ch of l) {
+    if (ch === '"') q = !q;
+    else if (ch === sep && !q) { r.push(c.trim()); c = ""; }
+    else c += ch;
+  }
+  r.push(c.trim());
+  return r;
+}
+
+function parseCSV(txt) {
+  const ls = txt.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n");
+  if (ls.length < 2) return null;
+  const sep = ls[0].includes("\t") ? "\t" : ",";
+  const h = csvLine(ls[0], sep).map(s => s.toLowerCase());
+  let ci = h.findIndex(s => s.includes("codi") || s.includes("code") || s.includes("cangur"));
+  let ei = h.findIndex(s => s.includes("electr") || s.includes("email") || s.includes("correu"));
+  let ti = h.findIndex(s => s.includes("temps") || s.includes("timestamp") || s.includes("marca") || s.includes("data"));
+  // Si no hi ha capçaleres reconeixibles, deduïm per la 1a fila de dades.
+  if (ci < 0 || ei < 0 || ti < 0) {
+    const f = csvLine(ls[1], sep);
+    if (ci < 0) ci = f.findIndex(v => /^[A-Z][a-d]\d{2}-\d{4}-\d{4}-CG-/.test(v));
+    if (ei < 0) ei = f.findIndex(v => v.includes("@"));
+    if (ti < 0) ti = f.findIndex(v => /\d{2}\/\d{2}\/\d{4}/.test(v));
+  }
+  return ls.slice(1).filter(l => l.trim()).map(l => {
+    const c = csvLine(l, sep);
+    return {
+      timestamp: ti >= 0 ? (c[ti] || "").trim() : "",
+      email: ei >= 0 ? (c[ei] || "").trim() : "",
+      rawCode: ci >= 0 ? (c[ci] || "").trim() : "",
+    };
+  });
+}
+
+/* ============================================================
+   Utils de presentació + pipeline
+   ============================================================ */
+function stu(email) {
+  return (!email || !email.includes("@")) ? (email || "—") : email.split("@")[0];
+}
+function xdate(ts) { const m = ts.match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; }
+function xtime(ts) { const m = ts.match(/(\d{1,2}):(\d{2}):\d{2}/); return m ? `${String(+m[1]).padStart(2,"0")}:${m[2]}` : ""; }
+function ctime(p) { return (p.hour == null) ? null : `${String(p.hour).padStart(2,"0")}:${String(p.minute).padStart(2,"0")}`; }
+function gap(t1, t2) {
+  const f = s => { const m = s && s.match(/^(\d{1,2}):(\d{2})$/); return m ? +m[1]*60 + +m[2] : null; };
+  const a = f(t1), b = f(t2);
+  return (a != null && b != null) ? b - a : null;
+}
+function humanDur(sec) {
+  if (sec == null || isNaN(sec)) return "—";
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+let allRows = [], filtRows = [], expIdx = null;
+
+function processRows(csv) {
+  return csv.map((r, i) => {
+    const p = parseCG(r.rawCode);
+    const st = stu(r.email), ds = xdate(r.timestamp), st2 = xtime(r.timestamp);
+    const ct = ctime(p), g = gap(ct, st2);
+    const status = p.valid ? ((g != null && g > GAP) ? "warn" : "ok") : "invalid";
+    const dd = ds ? ds.slice(8) + "/" + ds.slice(5,7) : "—";
+    return { idx:i, raw:r, parsed:p, student:st, dateStr:ds, dayDisplay:dd, sendTime:st2, codeTime:ct, gap:g, status };
+  });
+}
+
+function dots(arr) {
+  if (!arr || !arr.some(v => v > 0)) return '<span class="mu">—</span>';
+  return '<div class="rdots">' + arr.map(v => `<div class="rd" style="background:var(--r${v})"></div>`).join("") + "</div>";
+}
+function rstatus(s, e) {
+  if (s === "ok") return '<span title="Codi vàlid">✅</span>';
+  if (s === "warn") return `<span title="Δt &gt; ${GAP} min entre generar i enviar" style="cursor:help">⚠️</span>`;
+  return `<span title="${(e||"Invàlid").replace(/"/g,"&quot;")}" style="cursor:help">❌</span>`;
+}
+function rgap(g) {
+  if (g == null) return '<span class="mu">—</span>';
+  if (g <= 6) return `<span class="mu">${g}m</span>`;
+  if (g <= GAP) return `<span style="color:var(--warn)">${g}m</span>`;
+  return `<span style="color:var(--danger);font-weight:700">${g}m</span>`;
+}
+
+function renderRow(row) {
+  const p = row.parsed, open = expIdx === row.idx;
+  const cell = (v) => v != null && v !== "" ? v : '<span class="mu">—</span>';
+  const ok = p.format === "cg";
+  return `<tr class="${open?"row-exp":""}" id="row-${row.idx}" onclick="toggleDet(${row.idx})">
+    <td class="c-center">${rstatus(row.status, p.error)}</td>
+    <td class="tm">${row.dayDisplay}</td>
+    <td class="tm">${row.sendTime || '<span class="mu">—</span>'}</td>
+    <td title="${row.student}">${row.student}</td>
+    <td><button class="exp-btn ${open?"open":""}" onclick="event.stopPropagation();toggleDet(${row.idx})">${open?"▲":"▼"}</button></td>
+    <td>${ok?cell(p.cursLabel):'<span class="mu">—</span>'}</td>
+    <td class="tm">${ok?cell(p.any):'<span class="mu">—</span>'}</td>
+    <td class="c-center">${ok?p.answered:'<span class="mu">—</span>'}</td>
+    <td class="c-center" style="color:var(--ok);font-weight:600">${ok?p.solved:'<span class="mu">—</span>'}</td>
+    <td class="c-center" style="color:${ok&&p.errors>0?"var(--danger)":"var(--muted)"}">${ok?p.errors:'<span class="mu">—</span>'}</td>
+    <td class="c-center">${ok?p.hints:'<span class="mu">—</span>'}</td>
+    <td class="tm">${ok?humanDur(p.durationSec):'<span class="mu">—</span>'}</td>
+    <td>${rgap(row.gap)}</td>
+    <td>${ok?dots(p.resultsArray):'<span class="mu">—</span>'}</td>
+  </tr>${open?renderDet(row):""}`;
+}
+
+function renderDet(row) {
+  const p = row.parsed;
+  const items = [
+    { k:"Validació", v: p.checksumOk ? "✅ checksum OK" : "❌ checksum KO" },
+    { k:"Coherència", v: p.crossOk == null ? "—" : (p.crossOk ? "✅ quadra" : "❌ no quadra") },
+    { k:"Curs", v: p.cursLabel || "—" },
+    { k:"Convocatòria", v: p.any || "—" },
+    { k:"Data codi", v: p.day != null ? `${String(p.day).padStart(2,"0")}/${String(p.month).padStart(2,"0")}` : "—" },
+    { k:"Hora codi", v: row.codeTime || "—" },
+    { k:"Hora enviament", v: row.sendTime || "—" },
+    { k:"Respostes", v: p.answered != null ? String(p.answered) : "—" },
+    { k:"Encerts", v: p.solved != null ? String(p.solved) : "—" },
+    { k:"Errors", v: p.errors != null ? String(p.errors) : "—" },
+    { k:"Pistes", v: p.hints != null ? String(p.hints) : "—" },
+    { k:"Durada sessió", v: humanDur(p.durationSec) },
+  ];
+  let qgrid = "";
+  if (p.resultsArray && p.resultsArray.some(v => v > 0)) {
+    qgrid = '<div class="det-qgrid">' + p.resultsArray.map((v, i) => {
+      const n = i + 1;
+      if (v === 0) return `<div class="qcell q0"><span class="qn">${n}</span></div>`;
+      const inner = v === 9 ? "✗" : String(v);
+      return `<div class="qcell" style="background:var(--r${v})"><span class="qn">${n}</span>${inner}</div>`;
+    }).join("") + "</div>";
+  } else {
+    qgrid = '<div class="mu" style="font-size:12px">Cap problema respost en aquesta sessió.</div>';
+  }
+  const note = (!p.crossOk && p.format === "cg")
+    ? `<div class="warn-note">⚠️ Els comptadors codificats no coincideixen amb el detall per problema: el codi pot haver estat manipulat.</div>`
+    : "";
+  return `<tr class="det-row" id="detail-${row.idx}"><td colspan="14"><div class="det-panel">
+    <div class="det-code">${row.raw.rawCode}</div>
+    <div class="det-grid">${items.map(i => `<div class="det-item"><div class="dk">${i.k}</div><div class="dv">${i.v}</div></div>`).join("")}</div>
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px">Detall per problema (1–30)</div>
+    ${qgrid}
+    <div class="legend">
+      <div class="li"><div class="ld" style="background:var(--r1)"></div>resolt a la 1a</div>
+      <div class="li"><div class="ld" style="background:var(--r3)"></div>resolt amb intents (núm.)</div>
+      <div class="li"><div class="ld" style="background:var(--r9)"></div>respost, no resolt (✗)</div>
+      <div class="li"><div class="ld" style="background:var(--r0)"></div>no respost</div>
+    </div>
+    ${note}
+  </div></td></tr>`;
+}
+
+function toggleDet(i) {
+  expIdx = (expIdx === i) ? null : i;
+  renderTable(filtRows);
+}
+
+function renderStats(rows) {
+  const tot = rows.length;
+  const ok = rows.filter(r => r.status === "ok").length;
+  const wn = rows.filter(r => r.status === "warn").length;
+  const inv = rows.filter(r => r.status === "invalid").length;
+  const valid = rows.filter(r => r.parsed.format === "cg" && r.status !== "invalid");
+  const solvedAvg = valid.length ? (valid.reduce((a, r) => a + r.parsed.solved, 0) / valid.length).toFixed(1).replace(".", ",") : "—";
+  const accVals = valid.filter(r => r.parsed.answered > 0).map(r => r.parsed.solved / r.parsed.answered);
+  const acc = accVals.length ? Math.round(100 * accVals.reduce((a, b) => a + b, 0) / accVals.length) + "%" : "—";
+  document.getElementById("stat-pills").innerHTML =
+    `<div class="sp"><strong>${tot}</strong> entrades</div>
+     <div class="sp-sep"></div>
+     <div class="sp">✅ <strong class="ok">${ok}</strong></div>
+     <div class="sp">⚠️ <strong class="warn">${wn}</strong></div>
+     <div class="sp">❌ <strong class="danger">${inv}</strong></div>
+     <div class="sp-sep"></div>
+     <div class="sp">Encerts mitjans: <strong>${solvedAvg}</strong></div>
+     <div class="sp">% encert mitjà: <strong>${acc}</strong></div>`;
+}
+
+function renderTable(rows) {
+  const tb = document.getElementById("tbody"), em = document.getElementById("empty");
+  document.getElementById("count").textContent = `${rows.length} entrada${rows.length !== 1 ? "es" : ""}`;
+  if (!rows.length) { tb.innerHTML = ""; em.style.display = "block"; return; }
+  em.style.display = "none";
+  tb.innerHTML = rows.map(renderRow).join("");
+}
+
+function uniqSorted(vals) { return [...new Set(vals.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b))); }
+function fillSelect(id, vals, keep) {
+  const el = document.getElementById(id);
+  el.innerHTML = `<option value="">${keep}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join("");
+}
+function populate(rows) {
+  fillSelect("f-stu", uniqSorted(rows.map(r => r.student)), "Tots");
+  fillSelect("f-curs", uniqSorted(rows.map(r => r.parsed.cursLabel)), "Tots");
+  fillSelect("f-any", uniqSorted(rows.map(r => r.parsed.any)), "Totes");
+}
+
+function applyFilters() {
+  const st = document.getElementById("f-stu").value.trim();
+  const cu = document.getElementById("f-curs").value;
+  const an = document.getElementById("f-any").value;
+  const dt = document.getElementById("f-date").value;
+  const sta = document.getElementById("f-sta").value;
+  expIdx = null;
+  filtRows = allRows.filter(r => {
+    if (st && r.student !== st) return false;
+    if (cu && r.parsed.cursLabel !== cu) return false;
+    if (an && r.parsed.any !== an) return false;
+    if (dt && r.dateStr !== dt) return false;
+    if (sta && r.status !== sta) return false;
+    return true;
+  });
+  renderStats(filtRows);
+  renderTable(filtRows);
+}
+function clearFilters() {
+  ["f-stu","f-curs","f-any","f-sta"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("f-date").value = "";
+  applyFilters();
+}
+
+function loadData(txt) {
+  const csv = parseCSV(txt);
+  if (!csv || !csv.length) { alert("No s'han pogut llegir dades del CSV/TSV."); return; }
+  allRows = processRows(csv);
+  filtRows = [...allRows];
+  expIdx = null;
+  document.getElementById("upload-zone").style.display = "none";
+  document.getElementById("main-view").classList.add("visible");
+  document.getElementById("hdr-right").style.display = "flex";
+  populate(allRows);
+  renderStats(allRows);
+  renderTable(allRows);
+}
+
+function resetView() {
+  document.getElementById("upload-zone").style.display = "flex";
+  document.getElementById("main-view").classList.remove("visible");
+  document.getElementById("hdr-right").style.display = "none";
+  document.getElementById("paste-area").value = "";
+  allRows = []; filtRows = []; expIdx = null;
+}
+
+function exportSummary() {
+  const head = ["Alumne","Curs","Convocatoria","Respostes","Encerts","Errors","Pistes","Durada(s)","Estat","Gap(min)","Codi"];
+  const ls = [head.join(",")];
+  filtRows.forEach(r => {
+    const p = r.parsed;
+    ls.push([
+      r.student, p.cursLabel || "", p.any || "",
+      p.answered ?? "", p.solved ?? "", p.errors ?? "", p.hints ?? "",
+      p.durationSec ?? "", r.status, r.gap != null ? r.gap : "",
+      '"' + r.raw.rawCode.replace(/"/g, '""') + '"',
+    ].join(","));
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ls.join("\n")], { type: "text/csv;charset=utf-8;" }));
+  a.download = "cangur-resum.csv";
+  a.click();
+}
+
+function handleFile(f) { if (!f) return; const r = new FileReader(); r.onload = e => loadData(e.target.result); r.readAsText(f, "UTF-8"); }
+function handlePaste() { const t = document.getElementById("paste-area").value.trim(); if (!t) { alert("Enganxa el CSV primer."); return; } loadData(t); }
+
+const dz = document.getElementById("dropzone");
+dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
+dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("dragover"); const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+document.addEventListener("paste", e => {
+  if (document.getElementById("paste-area").matches(":focus")) return;
+  if (document.getElementById("upload-zone").style.display === "none") return;
+  const t = (e.clipboardData || window.clipboardData).getData("text");
+  if (t && t.includes("\n")) document.getElementById("paste-area").value = t;
+});
+</script>
+</body>
+</html>
