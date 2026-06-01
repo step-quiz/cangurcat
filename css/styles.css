@@ -72,15 +72,15 @@ body {
 }
 
 .app {
-  max-width: 1180px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 0.9rem 1rem 4rem;
+  padding: 0.9rem 1.5rem 4rem;
 }
 
 /* Quan la IA està desactivada, una sola columna més estreta i centrada
    (equival al max-width:70% de app.py en mode AI-off). */
 body.ai-off .app {
-  max-width: 820px;
+  max-width: 1100px;
 }
 
 /* ---- Títols ---- */
@@ -284,8 +284,52 @@ body.ai-off .layout {
   padding: 0.25rem 0.25rem 0.5rem;
 }
 body.ai-on .problem-panel {
+  /* sticky moved to .problem-nav-row so arrows stick too */
+}
+
+/* Nav wrapper: flanking << >> arrows around the problem card */
+.problem-nav-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.problem-nav-row .problem-panel {
+  flex: 1;
+  min-width: 0;
+}
+body.ai-on .problem-nav-row {
   position: sticky;
   top: 0.5rem;
+}
+
+.nav-arrow {
+  flex-shrink: 0;
+  width: 2.6rem;
+  min-height: 3.2rem;
+  background: #f3f4f6;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, border-color 0.15s, border-width 0.15s, color 0.15s;
+  position: sticky;
+  top: 0.5rem;
+  padding: 0.4rem 0.2rem;
+  line-height: 1;
+}
+.nav-arrow:hover:not(:disabled) {
+  background: var(--blue-accent);
+  border: 3px solid #000;
+  color: #fff;
+}
+.nav-arrow:disabled {
+  opacity: 0.18;
+  cursor: not-allowed;
 }
 
 /* Imatge de l'enunciat: respecta proporcions, centrada, mai retallada. */
