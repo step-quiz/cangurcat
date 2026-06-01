@@ -17,6 +17,10 @@
   let busy = false; // bloqueja accions mentre s'espera la IA
   let busyLabel = "";
   let draftMessage = ""; // preserva el text escrit entre re-renders
+  // Estat del menú hamburguesa (NOMÉS visible en mòbil horitzontal). En
+  // qualsevol altre context el CSS mostra tot el contingut i la hamburguesa
+  // resta oculta, així que aquest flag no hi té cap efecte visible.
+  let menuOpen = false;
 
   // ---- Estat de la SESSIÓ (acumula tots els problemes d'un mateix
   //      curs+convocatòria, per generar el codi de verificació) ----
@@ -198,6 +202,7 @@
       durationSec: Date.now() / 1000 - session.startedTs,
     });
     sessionFinished = true;
+    menuOpen = false;
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -215,6 +220,7 @@
     sessionFinished = false;
     lastCode = null;
     draftMessage = "";
+    menuOpen = false;
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -226,17 +232,22 @@
     // Panell final "Prova finalitzada" (substitueix tota la vista).
     if (sessionFinished && lastCode) {
       root.innerHTML =
-        `<h1 class="app-title">🦘 Prova Cangur</h1>` + renderFinishedPanel();
+        renderOrientationHint() +
+        `<h1 class="app-title">🦘 Prova Cangur</h1>` +
+        renderFinishedPanel();
       return;
     }
 
     const parts = [];
-    parts.push(`<h1 class="app-title">🦘 Prova Cangur</h1>`);
 
-    // Barra de sessió (apareix quan hi ha una sessió en curs).
-    if (session) {
-      parts.push(renderSessionBar());
-    }
+    // Avís (només mòbil vertical) suggerint girar el dispositiu. NO esborra
+    // res: és un banner fix que conviu amb tot el contingut.
+    parts.push(renderOrientationHint());
+
+    // Capçalera reagrupable: títol + barra de sessió + selector. En mòbil
+    // horitzontal es plega dins una hamburguesa per deixar l'enunciat
+    // visible de seguida; a la resta de mides es mostra tal com sempre.
+    parts.push(renderTopChrome());
 
     if (!state) {
       parts.push(`
@@ -245,8 +256,6 @@
           Tria un problema aquí sota i prem <strong>🎯 Inicia el problema</strong>.
         </div>`);
     }
-
-    parts.push(renderSelector());
 
     if (state) {
       parts.push(renderSession());
@@ -257,6 +266,50 @@
     // Restaura el text del missatge si n'hi havia (re-render no el perd).
     const ta = root.querySelector('[data-role="message-input"]');
     if (ta) ta.value = draftMessage;
+  }
+
+  // Banner fix d'orientació: el CSS només el fa visible en mòbil vertical.
+  function renderOrientationHint() {
+    return `<div class="orientation-hint" role="note">
+      🔄 Gira el mòbil en horitzontal: l'enunciat es veu molt més gran i clar.
+    </div>`;
+  }
+
+  // Capçalera superior. La barra de sessió i el selector viuen dins un
+  // contenidor plegable; el botó hamburguesa només apareix (via CSS) en
+  // mòbil horitzontal. El títol s'amaga en aquell mateix context.
+  function renderTopChrome() {
+    const sessionBar = session ? renderSessionBar() : "";
+    const selector = renderSelector();
+
+    // Etiqueta compacta per a la barra hamburguesa (context mínim visible
+    // quan el menú està plegat): curs/convocatòria si hi ha sessió.
+    let burgerCtx = "Menú";
+    if (session) {
+      const cursLabel =
+        (window.Codi.CURS_LABEL && window.Codi.CURS_LABEL[session.curs]) ||
+        session.curs;
+      burgerCtx = `${cursLabel} · ${session.any}`;
+    }
+
+    const openAttr = menuOpen ? "true" : "false";
+
+    return `
+      <div class="topchrome" data-open="${openAttr}" data-role="topchrome">
+        <h1 class="app-title">🦘 Prova Cangur</h1>
+        <div class="burger-bar">
+          <span class="burger-ctx">🦘 ${esc(burgerCtx)}</span>
+          <button class="burger-btn" data-action="toggle-menu"
+            aria-expanded="${openAttr}" aria-label="Obre o tanca el menú">
+            <span class="burger-icon">${menuOpen ? "✕" : "☰"}</span>
+            <span class="burger-text">${menuOpen ? "Tanca" : "Menú"}</span>
+          </button>
+        </div>
+        <div class="topchrome-body" data-role="topchrome-body">
+          ${sessionBar}
+          ${selector}
+        </div>
+      </div>`;
   }
 
   // Barra superior de progrés de la sessió + botó per finalitzar i obtenir
@@ -708,6 +761,7 @@
       // Crea/continua/reinicia la sessió segons el curs+convocatòria.
       ensureSession(state.problem);
       draftMessage = "";
+      menuOpen = false; // en obrir problema, plega sempre la hamburguesa
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
@@ -820,7 +874,11 @@
     if (!el) return;
     const action = el.dataset.action;
 
-    if (action === "pill") {
+    if (action === "toggle-menu") {
+      menuOpen = !menuOpen;
+      render();
+      return;
+    } else if (action === "pill") {
       const group = el.dataset.group;
       const value = el.dataset.value;
       if (group === "curs") selCurs = value;
@@ -836,6 +894,9 @@
       if (det) det.open = true;
     } else if (action === "start") {
       const sel = root.querySelector('[data-role="problem-select"]');
+      // En obrir un problema, plega la hamburguesa: l'alumne vol veure
+      // l'enunciat, no el menú.
+      menuOpen = false;
       startProblem(sel ? sel.value : selectedPid);
     } else if (action === "start-next") {
       const nextPid = T.nextProblemId(state.problem.id);
