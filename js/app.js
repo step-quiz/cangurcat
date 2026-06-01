@@ -259,6 +259,14 @@
     // Restaura el text del missatge si n'hi havia (re-render no el perd).
     const ta = root.querySelector('[data-role="message-input"]');
     if (ta) ta.value = draftMessage;
+
+    // Quan la hamburguesa està oberta (només té efecte visible en mòbil
+    // horitzontal), el selector "Escull un problema" s'ha de veure ja
+    // desplegat, no plegat.
+    if (menuOpen) {
+      const selDet = root.querySelector("details.selector");
+      if (selDet) selDet.open = true;
+    }
   }
 
   // Banner fix d'orientació: el CSS només el fa visible en mòbil vertical.

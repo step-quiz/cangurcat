@@ -1367,4 +1367,46 @@ details.trace > summary:focus-visible {
   .orientation-hint {
     display: none;
   }
+
+  /* ---- Targeta del problema a tota l'amplada ----
+     En horitzontal amaguem les fletxes laterals « » (es pot navegar des del
+     menú i amb el botó "problema següent"); així la targeta de l'enunciat
+     ocupa el 100% de l'amplada del viewport, sense marges morts. */
+  .problem-nav-row {
+    gap: 0;
+  }
+  .problem-nav-row .nav-arrow {
+    display: none;
+  }
+  .problem-panel {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* ---- Botó "Menú" més petit (guanya alçada vertical) ---- */
+  .burger-btn {
+    min-height: 2rem;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.85rem;
+    gap: 0.3rem;
+  }
+  .burger-icon {
+    font-size: 0.95rem;
+  }
+  /* La barra hamburguesa també una mica més plana. */
+  .topchrome .burger-bar {
+    padding: 0.25rem 0.5rem 0.25rem 0.8rem;
+    margin-bottom: 0.4rem;
+  }
+
+  /* ---- El menú desplegat NO ha de tapar el botó per replegar-lo ----
+     La barra hamburguesa queda per damunt (z-index alt) i sempre clicable;
+     el desplegable s'ancora JUST A SOTA de la barra, no des de dalt de tot. */
+  .topchrome .burger-bar {
+    position: relative;
+    z-index: 70;
+  }
+  .topchrome[data-open="true"] .topchrome-body {
+    top: 3rem; /* alçada aproximada de la barra + marge: obre a sota */
+  }
 }
