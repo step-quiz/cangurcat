@@ -175,6 +175,17 @@
     return `${s} s`;
   }
 
+  // Problema anterior dins el mateix curs+convocatòria.
+  function prevProblemId(pid) {
+    const available = T.getAvailableProblems();
+    const idx = available.indexOf(pid);
+    if (idx <= 0) return null;
+    const prv = available[idx - 1];
+    const cur = T.getProblem(pid);
+    const pp = T.getProblem(prv);
+    return pp.categoria === cur.categoria && pp.any === cur.any ? prv : null;
+  }
+
   // Calcula i congela el codi de verificació de la sessió.
   function finishSession() {
     if (!session) return;
@@ -298,9 +309,9 @@
           <div class="copied-msg" data-role="copied-msg">Copiat! ✅</div>
         </div>
 
-        <div class="forms-box" data-role="forms-box" style="display:none">
-          <p class="forms-box-label">Clica l'enllaç següent per obrir el Google Forms:</p>
-          <a class="btn btn-forms" href="https://docs.google.com/forms/d/e/1FAIpQLSfGul0XzwH_SiJ8Vr8kOe_J5pHNFCohSk1tW1dpz8GZuB7f_Q/viewform" target="_blank" rel="noopener noreferrer">Enquesta</a>
+        <div class="code-box" data-role="forms-box" style="display:none">
+          <p class="code-box-label">Clica l'enllaç següent per obrir el Google Forms:</p>
+          <a class="btn btn-start btn-full" href="https://docs.google.com/forms/d/e/1FAIpQLSfGul0XzwH_SiJ8Vr8kOe_J5pHNFCohSk1tW1dpz8GZuB7f_Q/viewform" target="_blank" rel="noopener noreferrer">Enquesta</a>
         </div>
 
         <div class="finished-actions">
@@ -476,10 +487,16 @@
     }
 
     html += `</section>`;
-    return html;
-  }
 
-  function renderEliminationCard() {
+    // Fletxes de navegació (esquerra i dreta del panell)
+    const prevPid = prevProblemId(p.id);
+    const nextPid = T.nextProblemId(p.id);
+    return `<div class="problem-nav-row">
+      <button class="nav-arrow nav-prev" data-action="nav-prev" ${prevPid ? `data-pid="${esc(prevPid)}"` : "disabled"} title="Problema anterior">«</button>
+      ${html}
+      <button class="nav-arrow nav-next" data-action="nav-next" ${nextPid ? `data-pid="${esc(nextPid)}"` : "disabled"} title="Problema següent">»</button>
+    </div>`;
+  }
     const eliminated = new Set(state.eliminated_options || []);
     const chips = T.VALID_LETTERS.map((letter) => {
       const cls = eliminated.has(letter)
@@ -513,7 +530,7 @@
     let html = `<section class="dialogue-panel">
       <h3 class="dialeg-title">Diàleg</h3>
       ${renderConversation({ hideHints: verdict !== null })}
-      ${renderFlash({ exclude: "commit_ok" })}`;
+      ${verdict === null ? renderFlash({ exclude: "commit_ok" }) : ""}`;
 
     if (verdict !== null) {
       if (DEBUG) html += `<hr class="divider"/>${renderTraceExpander()}`;
@@ -542,8 +559,8 @@
     // Un cop resolt, la pista ja és soroll: no es mostra.
     if (verdict === null) {
       html += renderHintsOnly();
+      html += renderFlash({ exclude: "commit_ok" });
     }
-    html += renderFlash({ exclude: "commit_ok" });
     if (verdict !== null && DEBUG) {
       html += `<hr class="divider"/>${renderTraceExpander()}`;
     }
@@ -821,6 +838,9 @@
     } else if (action === "start-next") {
       const nextPid = T.nextProblemId(state.problem.id);
       startProblem(nextPid);
+    } else if (action === "nav-prev" || action === "nav-next") {
+      const pid = el.dataset.pid;
+      if (pid) startProblem(pid);
     } else if (action === "hint") {
       doHint();
     } else if (action === "enter-commit") {
