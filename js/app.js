@@ -255,19 +255,17 @@
     const cursLabel =
       (window.Codi.CURS_LABEL && window.Codi.CURS_LABEL[session.curs]) ||
       session.curs;
-    const dur = humanitzeDur(Date.now() / 1000 - session.startedTs);
+    // "Preguntes treballades" = problemes que l'alumne ha obert en aquesta
+    // sessió (els comptadors detallats —encerts, errors, pistes, temps—
+    // segueixen viatjant dins el codi i es veuen a l'analitzador).
+    const worked = Object.keys(t.problems).length;
+    const workedLabel =
+      worked === 1 ? "pregunta treballada" : "preguntes treballades";
     return `
       <div class="session-bar">
         <div class="sb-info">
-          <span class="sb-title">Sessió en curs</span>
-          <span class="sb-ctx">${esc(cursLabel)} · convocatòria ${session.any}</span>
-        </div>
-        <div class="sb-stats">
-          <span class="sb-chip"><strong>${t.answered}</strong> respostes</span>
-          <span class="sb-chip sb-ok"><strong>${t.solved}</strong> encerts</span>
-          <span class="sb-chip sb-err"><strong>${t.errors}</strong> errors</span>
-          <span class="sb-chip"><strong>${t.hints}</strong> pistes</span>
-          <span class="sb-chip sb-time">⏱ ${dur}</span>
+          <span class="sb-title">Prova Cangur: ${esc(cursLabel)} (${session.any})</span>
+          <span class="sb-ctx"><strong>${worked}</strong> ${workedLabel}</span>
         </div>
         <button class="btn btn-finish" data-action="finish-session" title="Genera el codi per lliurar al professorat">
           🏁 Finalitzar i obtenir el codi
@@ -545,10 +543,12 @@
       (t) => t.kind === "hint"
     );
     if (!hints.length) return "";
+    const lastIdx = hints.length - 1;
     return hints
-      .map((turn) => {
+      .map((turn, i) => {
         const badge = turn.source === "catalog" ? "📘" : "💡";
-        return `<div class="chat-hint" style="margin-right:0"><strong>${badge}</strong><br/>${formatMd(
+        const anchor = i === lastIdx ? ' data-role="last-hint"' : "";
+        return `<div class="chat-hint" style="margin-right:0"${anchor}><strong>${badge}</strong><br/>${formatMd(
           turn.content
         )}</div>`;
       })
@@ -562,13 +562,20 @@
     }
     let html = `<div class="chat-thread">`;
     let rendered = false;
-    for (const turn of history) {
+    // Índex de l'última pista, per ancorar-hi el scroll automàtic.
+    let lastHintIdx = -1;
+    for (let k = 0; k < history.length; k++) {
+      if ((history[k].kind || "message") === "hint") lastHintIdx = k;
+    }
+    for (let hi = 0; hi < history.length; hi++) {
+      const turn = history[hi];
       const role = turn.role;
       const kind = turn.kind || "message";
       const content = formatMd(turn.content);
       if (kind === "hint") {
         const badge = turn.source === "catalog" ? "📘" : "💡";
-        html += `<div class="chat-hint"><strong>${badge}</strong><br/>${content}</div>`;
+        const anchor = hi === lastHintIdx ? ' data-role="last-hint"' : "";
+        html += `<div class="chat-hint"${anchor}><strong>${badge}</strong><br/>${content}</div>`;
         rendered = true;
       } else if (kind === "system_event") {
         continue; // context intern per a la IA; no es mostra
@@ -699,6 +706,18 @@
     busy = false;
     busyLabel = "";
     render();
+    scrollToLastHint();
+  }
+
+  // Després de demanar una pista, porta-la a la vista (sovint queda sota el
+  // viewport). Espera un frame perquè el DOM ja estigui pintat.
+  function scrollToLastHint() {
+    requestAnimationFrame(() => {
+      const el = root.querySelector('[data-role="last-hint"]');
+      if (el && el.scrollIntoView) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
   }
 
   async function doCommit(letter) {
