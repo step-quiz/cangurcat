@@ -223,3 +223,12 @@ checksum **i** amb la verificació creuada de `R`.
 > Es manté com a eina **separada** de l'analitzador de Competències
 > Bàsiques (que té llicència CC BY-NC-ND i columnes diferents). La lògica de
 > descodificació del codi és idèntica a `js/codi.js`, per garantir paritat.
+
+<!-- atribucio-centre:inici -->
+
+---
+
+Material desenvolupat per **David Arso Civil** per al Departament de Matemàtiques de l'INS Miquel Tarradell.
+Contingut sota CC BY-NC-SA 4.0, codi sota llicència MIT. Vegeu [`LLICENCIA.md`](LLICENCIA.md).
+
+<!-- atribucio-centre:final -->
