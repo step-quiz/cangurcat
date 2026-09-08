@@ -29,3 +29,11 @@ L'autoria correspon a la persona que va crear el material i no es transfereix: e
 > Contingut sota CC BY-NC-SA 4.0, codi sota llicència MIT.
 
 El text legal complet és al fitxer [`LICENSE`](LICENSE).
+
+## Material de tercers
+
+Aquest projecte incorpora les proves Cangur, de la Societat Catalana de Matemàtiques, que no són obra de David Arso Civil.
+
+La llicència empara únicament les aportacions pròpies: la programació, la selecció i l'organització del material, les explicacions, les pistes, les solucions redactades i el disseny de l'activitat.
+
+Els enunciats originals conserven els drets dels seus autors i no es llicencien aquí.
