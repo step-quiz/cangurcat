@@ -1,12 +1,13 @@
 # Tutor Cangur — web estàtica (HTML vainilla)
 
 Versió **estàtica** del Tutor Cangur: HTML + CSS + JS purs, sense Streamlit
-i sense servidor. Es desplega tal qual a qualsevol hosting estàtic (per
-exemple `cangur.step-quiz.net`) i funciona directament.
+i sense servidor. Es publica a `cangurcat.step-quiz.net` i funciona tal qual
+a qualsevol hosting estàtic.
 
-La lògica de Python **es manté intacta**: aquesta web no la substitueix,
-la complementa. El catàleg de problemes (`problems_*.py`) continua sent
-l'**única font de veritat**.
+Aquest repositori conté **només la web generada** (el que abans era la carpeta
+`web/`). La lògica de Python —l'app Streamlit (`app.py`, `tutor.py`, `llm.py`) i
+el catàleg de problemes (`problems_*.py`), que és l'**única font de veritat**— viu
+al repositori privat `tutor-cangur`.
 
 ---
 
@@ -28,29 +29,30 @@ desactivat amb un missatge amable, exactament com a Streamlit.
 
 ---
 
-## Arquitectura DRY
+## Arquitectura
 
 ```
+tutor-cangur (repositori privat)
 problems_*.py  ─┐  (font de veritat: 480 problemes)
                 │
                 ▼
-        build_static.py            ← importa `problems`, NO duplica res
-                │
+        build_static.py            ← importa `problems`, no duplica res
+                │                     (ATENCIÓ: aquest script no és a cap repositori)
                 ▼
-   web/data/problems.js            ← dades generades per al navegador
-   web/data/img/*.jpg              ← imatges copiades
-
-web/
-├── index.html        Punt d'entrada (mount + scripts en ordre)
-├── config.js         Porta ENABLE_AI (equival al secret de Streamlit)
-├── css/styles.css    Port fidel del CSS de app.py
+cangurcat (aquest repositori)
+├── index.html             Punt d'entrada (mount + scripts en ordre)
+├── config.js              Porta ENABLE_AI (equival al secret de Streamlit)
+├── css/styles.css         Port fidel del CSS d'app.py
 ├── js/
-│   ├── llm.js         Mirall de la porta IA de llm.py (discuss / generate_hint)
-│   ├── tutor.js       Mirall FIDEL de la màquina d'estats de tutor.py
-│   └── app.js         Controlador de la UI (equival a app.py, sense domini)
-└── data/
-    ├── problems.js    GENERAT — no editar a mà
-    └── img/           480 imatges dels enunciats
+│   ├── llm.js             Mirall de la porta IA de llm.py (discuss / generate_hint)
+│   ├── tutor.js           Mirall de la màquina d'estats de tutor.py
+│   ├── codi.js            Genera i descodifica el codi de verificació (vegeu més avall)
+│   └── app.js             Controlador de la UI (equival a app.py, sense domini)
+├── data/
+│   ├── problems.js        GENERAT — no editar a mà
+│   └── img/               480 imatges dels enunciats
+├── analitzador-cangur.html  Analitzador del professorat (vegeu més avall)
+└── mostra-respostes.csv   Exemple de CSV del Google Form per provar l'analitzador
 ```
 
 Correspondència directa Python ↔ JS (mateixos noms):
@@ -67,21 +69,20 @@ Correspondència directa Python ↔ JS (mateixos noms):
 
 ---
 
-## Com regenerar la web (després d'editar el catàleg)
+## Com regenerar les dades (després d'editar el catàleg)
 
-Sempre que canviïs `problems_1eso.py … problems_4eso.py`, torna a executar:
-
-```bash
-python build_static.py
-```
-
-Opcions:
+`data/problems.js` i `data/img/` els genera `build_static.py` a partir de
+`problems_1eso.py … problems_4eso.py`. **Aquest script no és ni en aquest
+repositori ni a `tutor-cangur`**: si s'ha de tornar a generar el catàleg, cal
+recuperar-lo o reescriure'l. Les opcions que tenia eren:
 
 ```bash
 python build_static.py --output-dir web      # carpeta de sortida (per defecte: web)
 python build_static.py --skip-images          # regenera només les dades
 python build_static.py --salt EL_TEU_SALT      # fixa el salt del hash de respostes
 ```
+
+Mentrestant, `data/problems.js` s'ha de tractar com a fitxer de només lectura.
 
 ---
 
@@ -90,7 +91,6 @@ python build_static.py --salt EL_TEU_SALT      # fixa el salt del hash de respos
 Cal servir la carpeta (un servidor estàtic qualsevol):
 
 ```bash
-cd web
 python -m http.server 8000
 # obre http://localhost:8000
 ```
@@ -99,11 +99,10 @@ python -m http.server 8000
 > dades viatgen com a `problems.js` (no com a `fetch` d'un JSON, que el
 > navegador bloquejaria en local).
 
-## Com desplegar a `cangur.step-quiz.net`
+## Desplegament
 
-Puja el **contingut** de `web/` a l'arrel del hosting estàtic (Netlify,
-Cloudflare Pages, GitHub Pages, S3, Nginx…). No cal cap pas de build al
-servidor: els artefactes ja estan generats.
+Es publica l'arrel d'aquest repositori (`cangurcat.step-quiz.net`). No cal cap
+pas de build: els artefactes ja estan generats.
 
 ---
 
@@ -221,7 +220,7 @@ agregades; i **exportació** d'un CSV de resum. Cada fila es valida amb el
 checksum **i** amb la verificació creuada de `R`.
 
 > Es manté com a eina **separada** de l'analitzador de Competències
-> Bàsiques (que té llicència CC BY-NC-ND i columnes diferents). La lògica de
+> Bàsiques (que té columnes diferents). La lògica de
 > descodificació del codi és idèntica a `js/codi.js`, per garantir paritat.
 
 <!-- atribucio-centre:inici -->
