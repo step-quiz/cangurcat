@@ -13,8 +13,8 @@ al repositori privat `tutor-cangur`.
 
 ## Què funciona sense IA (per defecte)
 
-Tota l'experiència determinista, idèntica a la versió Streamlit amb
-`ENABLE_AI=0`:
+Tota l'experiència determinista de la versió Streamlit, sense les crides a la IA
+(`ENABLE_AI: "0"` a `config.js`):
 
 - Selecció de problema (filtres Curs / Any / Punts + desplegable).
 - Imatge de l'enunciat i targeta d'opcions A–E.
@@ -25,7 +25,8 @@ Tota l'experiència determinista, idèntica a la versió Streamlit amb
 - **Rastre JSON** de la sessió, descarregable.
 
 El que necessita IA (xat lliure i pistes generades on-demand) queda
-desactivat amb un missatge amable, exactament com a Streamlit.
+desactivat amb un missatge amable. (L'app Streamlit actual de `tutor-cangur` no té
+cap interruptor `ENABLE_AI`: sempre crida Gemini.)
 
 ---
 
