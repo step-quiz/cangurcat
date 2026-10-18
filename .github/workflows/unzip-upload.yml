@@ -16,8 +16,8 @@
 #  · Un ZIP trencat es treu de _uploads/ (perquè no bloquegi els següents),
 #    no se'n desa res i l'execució acaba en vermell amb el seu nom: cal tornar
 #    a generar-lo i pujar-lo.
-#  · El commit no porta «[skip ci]» ni cap etiqueta semblant: Cloudflare
-#    Pages no el publicaria.
+#  · El missatge del commit no porta cap etiqueta per saltar la CI:
+#    Cloudflare Pages no el publicaria.
 #  · També es pot llançar a mà: Actions → «Extract and commit zip uploads» →
 #    Run workflow (processa els ZIP que hi hagi a _uploads/).
 name: Extract and commit zip uploads
