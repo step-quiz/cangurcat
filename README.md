@@ -4,10 +4,10 @@ Versió **estàtica** del Tutor Cangur: HTML + CSS + JS purs, sense Streamlit
 i sense servidor. Es publica a `cangurcat.step-quiz.net` i funciona tal qual
 a qualsevol hosting estàtic.
 
-Aquest repositori conté **només la web generada** (el que abans era la carpeta
-`web/`). La lògica de Python —l'app Streamlit (`app.py`, `tutor.py`, `llm.py`) i
-el catàleg de problemes (`problems_*.py`), que és l'**única font de veritat**— viu
-al repositori privat `tutor-cangur`.
+Va néixer com la versió web de l'app Streamlit del repositori privat `tutor-cangur`
+(`app.py`, `tutor.py`, `llm.py`), però ara és autosuficient: el catàleg de problemes,
+`data/problems.js`, és la font de veritat i es manté amb `eines/problemes.py` (vegeu
+«El catàleg»).
 
 ---
 
@@ -33,13 +33,6 @@ cap interruptor `ENABLE_AI`: sempre crida Gemini.)
 ## Arquitectura
 
 ```
-tutor-cangur (repositori privat)
-problems_*.py  ─┐  (font de veritat: 480 problemes)
-                │
-                ▼
-        build_static.py            ← importa `problems`, no duplica res
-                │                     (ATENCIÓ: aquest script no és a cap repositori)
-                ▼
 cangurcat (aquest repositori)
 ├── index.html             Punt d'entrada (mount + scripts en ordre)
 ├── config.js              Porta ENABLE_AI (equival al secret de Streamlit)
@@ -50,8 +43,9 @@ cangurcat (aquest repositori)
 │   ├── codi.js            Genera i descodifica el codi de verificació (vegeu més avall)
 │   └── app.js             Controlador de la UI (equival a app.py, sense domini)
 ├── data/
-│   ├── problems.js        GENERAT — no editar a mà
+│   ├── problems.js        El catàleg (font de veritat). No editar a mà: eines/problemes.py
 │   └── img/               480 imatges dels enunciats
+├── eines/problemes.py     Manté el catàleg: comprova, afegeix una edició, respostes
 ├── analitzador-cangur.html  Analitzador del professorat (vegeu més avall)
 └── mostra-respostes.csv   Exemple de CSV del Google Form per provar l'analitzador
 ```
@@ -70,20 +64,31 @@ Correspondència directa Python ↔ JS (mateixos noms):
 
 ---
 
-## Com regenerar les dades (després d'editar el catàleg)
+## El catàleg: com afegir una edició nova
 
-`data/problems.js` i `data/img/` els genera `build_static.py` a partir de
-`problems_1eso.py … problems_4eso.py`. **Aquest script no és ni en aquest
-repositori ni a `tutor-cangur`**: si s'ha de tornar a generar el catàleg, cal
-recuperar-lo o reescriure'l. Les opcions que tenia eren:
+`data/problems.js` és la **font de veritat** del catàleg: 480 problemes (edicions
+2023–2026, quatre categories, 30 per categoria). Abans el generava `build_static.py`
+a partir dels `problems_*.py` del repositori `tutor-cangur`, però aquell script no és a
+cap repositori i `tutor-cangur` només tenia l'edició 2026. Des del 18/10/2026 el
+catàleg es manté amb `eines/problemes.py` (només Python estàndard):
 
 ```bash
-python build_static.py --output-dir web      # carpeta de sortida (per defecte: web)
-python build_static.py --skip-images          # regenera només les dades
-python build_static.py --salt EL_TEU_SALT      # fixa el salt del hash de respostes
+python3 eines/problemes.py plantilla 2027 > noves.csv   # CSV buit: 4 categories × 30
+#   … omple tema, resposta (A–E) i pista_inicial; posa les imatges a
+#   data/img/CAN-<categoria>-2027-<NN>.jpg …
+python3 eines/problemes.py afegeix noves.csv            # les afegeix (resposta xifrada)
+python3 eines/problemes.py comprova                     # ha de dir «✓ … problemes correctes»
+python3 eines/problemes.py respostes 2027 1ESO          # les respostes, per comprovar-les
 ```
 
-Mentrestant, `data/problems.js` s'ha de tractar com a fitxer de només lectura.
+`afegeix` no toca res si el CSV té cap error (lletra que no és A–E, imatge que falta,
+problema que ja hi és). `comprova` revisa tot el catàleg: ids, punts, imatges, 30
+problemes per categoria i edició, i que cada resposta xifrada correspongui a una sola
+lletra. GitHub l'executa a cada canvi (`.github/workflows/tests.yml`).
+
+La resposta es desa com `sha256(CANGUR_SALT + id + lletra)`, la mateixa comprovació que
+fa `js/tutor.js`. És dissuasiva, no secreta: amb el salt, que és públic, n'hi ha prou
+de provar les cinc lletres.
 
 ---
 
@@ -148,8 +153,7 @@ reactivar.
 
 > Nota menor: la versió Streamlit retallava un 5% els marges laterals
 > blancs de cada imatge. Aquí es mostra la imatge sencera (més robust amb
-> 480 imatges diferents). Es pot tornar a afegir al `build_static.py` si
-> es vol.
+> 480 imatges diferents).
 
 ---
 

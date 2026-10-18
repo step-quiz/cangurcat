@@ -1,0 +1,26 @@
+# Comprova el catàleg de problemes (python3 eines/problemes.py comprova): ids,
+# punts, imatges, 30 problemes per categoria i edició, i que cada resposta
+# xifrada correspongui a una sola lletra.
+# S'executa a cada canvi a main, a cada pull request i a mà. No escriu res.
+# Els commits del bot dels ZIP no el disparen per si sols (regla de GitHub):
+# per això unzip-upload.yml el llança després de desar.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proves:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Catàleg de problemes
+        run: python3 eines/problemes.py comprova

@@ -20,6 +20,8 @@
 #    Cloudflare Pages no el publicaria.
 #  · També es pot llançar a mà: Actions → «Extract and commit zip uploads» →
 #    Run workflow (processa els ZIP que hi hagi a _uploads/).
+#
+# Extra de cangurcat: després de desar, llança tests.yml.
 name: Extract and commit zip uploads
 
 on:
@@ -31,6 +33,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: unzip-uploads-${{ github.ref }}
@@ -86,6 +89,14 @@ jobs:
           git push origin "HEAD:${GITHUB_REF_NAME}"
           echo "desat=true" >> "$GITHUB_OUTPUT"
           git diff --name-only HEAD~1 HEAD | sed 's/^/  /'
+
+      # Un commit fet per aquest workflow no llança cap altre workflow (regla de
+      # GitHub), així que les proves no s'executarien soles: es llancen aquí.
+      - name: Llança la comprovació del catàleg (tests.yml)
+        if: steps.desa.outputs.desat == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run tests.yml --ref "$GITHUB_REF_NAME"
 
       - name: Comprova que cap ZIP no estigués trencat
         run: |
