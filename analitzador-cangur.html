@@ -161,7 +161,7 @@ tr.row-exp{background:#eff6ff!important;}
 "use strict";
 
 /* ============================================================
-   Descodificació del codi "CG" — IDÈNTICA a web/js/codi.js
+   Descodificació del codi "CG" — IDÈNTICA a js/codi.js
    (es manté inline perquè l'analitzador sigui autònom).
    Format (10 segments):
    {L}{salt}-{DDMM}-{HHMM}-CG-{curs}-{QQ}-{AA}-{PP}-{TTTTT}-{R(30)}
@@ -171,9 +171,15 @@ const CHAR_CURS = { a:"1ESO", b:"2ESO", c:"3ESO", d:"4ESO" };
 const CURS_LABEL = { "1ESO":"1r ESO","2ESO":"2n ESO","3ESO":"3r ESO","4ESO":"4t ESO" };
 const CURS_NUM = { "1ESO":1,"2ESO":2,"3ESO":3,"4ESO":4 };
 
-function chkCG(ltr, qq, aa, pp, cnum, dd, mm, hh, mn, saltChar0) {
+// Lletra de control: 'nova' (des del 18/10/2026; cobreix també la durada i R),
+// 'antiga' (només els comptadors, la data i l'hora) o null. Idèntica a js/codi.js.
+function versioCG(ltr, qq, aa, pp, cnum, dd, mm, hh, mn, saltChar0, cos) {
   const suma = qq + aa + pp + cnum + dd + mm + hh + mn + saltChar0;
-  return LC.charAt(suma % 23) === ltr;
+  let sc = 0;
+  for (let i = 0; i < cos.length; i++) sc += ((i % 22) + 1) * cos.charCodeAt(i);
+  if (LC.charAt((suma + sc) % 23) === ltr) return "nova";
+  if (LC.charAt(suma % 23) === ltr) return "antiga";
+  return null;
 }
 
 function parseCG(raw) {
@@ -194,7 +200,8 @@ function parseCG(raw) {
   const dd = +p[1].slice(0,2), mm = +p[1].slice(2,4), hh = +p[2].slice(0,2), mn = +p[2].slice(2,4);
   const cnum = +p[4], qq = +p[5], aa = +p[6], pp = +p[7], dur = +p[8];
   const results = p[9];
-  const checksumOk = chkCG(ltr, qq, aa, pp, cnum, dd, mm, hh, mn, salt.charCodeAt(0));
+  const versio = versioCG(ltr, qq, aa, pp, cnum, dd, mm, hh, mn, salt.charCodeAt(0), p[8] + results);
+  const checksumOk = versio !== null;
   const resultsArray = results.split("").map(Number);
 
   // Verificació creuada: els comptadors han de coincidir amb la cadena R.
@@ -204,6 +211,7 @@ function parseCG(raw) {
 
   return {
     format:"cg", valid: checksumOk && crossOk, checksumOk, crossOk,
+    resultatsVerificats: versio === "nova",
     curs: CHAR_CURS[cursChar] || null,
     cursLabel: CURS_LABEL[CHAR_CURS[cursChar]] || null,
     any: /^\d{2}$/.test(any2) ? "20" + any2 : null,
@@ -295,8 +303,10 @@ function dots(arr) {
   if (!arr || !arr.some(v => v > 0)) return '<span class="mu">—</span>';
   return '<div class="rdots">' + arr.map(v => `<div class="rd" style="background:var(--r${v})"></div>`).join("") + "</div>";
 }
-function rstatus(s, e) {
-  if (s === "ok") return '<span title="Codi vàlid">✅</span>';
+const TITOL_ANTIC = "Codi vàlid amb el format d'abans del 18/10/2026: els comptadors, la data i l'hora estan verificats, però la durada i el detall per problema no";
+function rstatus(s, e, p) {
+  if (s === "ok" && p && !p.resultatsVerificats) return `<span title="${TITOL_ANTIC}" style="cursor:help">☑️</span>`;
+  if (s === "ok") return '<span title="Codi vàlid, amb la durada i el detall per problema verificats">✅</span>';
   if (s === "warn") return `<span title="Δt &gt; ${GAP} min entre generar i enviar" style="cursor:help">⚠️</span>`;
   return `<span title="${(e||"Invàlid").replace(/"/g,"&quot;")}" style="cursor:help">❌</span>`;
 }
@@ -312,7 +322,7 @@ function renderRow(row) {
   const cell = (v) => v != null && v !== "" ? v : '<span class="mu">—</span>';
   const ok = p.format === "cg";
   return `<tr class="${open?"row-exp":""}" id="row-${row.idx}" onclick="toggleDet(${row.idx})">
-    <td class="c-center">${rstatus(row.status, p.error)}</td>
+    <td class="c-center">${rstatus(row.status, p.error, p)}</td>
     <td class="tm">${row.dayDisplay}</td>
     <td class="tm">${row.sendTime || '<span class="mu">—</span>'}</td>
     <td title="${row.student}">${row.student}</td>
@@ -332,7 +342,7 @@ function renderRow(row) {
 function renderDet(row) {
   const p = row.parsed;
   const items = [
-    { k:"Validació", v: p.checksumOk ? "✅ checksum OK" : "❌ checksum KO" },
+    { k:"Validació", v: !p.checksumOk ? "❌ checksum KO" : (p.resultatsVerificats ? "✅ checksum OK (durada i detall inclosos)" : "☑️ checksum OK (format antic: durada i detall sense verificar)") },
     { k:"Coherència", v: p.crossOk == null ? "—" : (p.crossOk ? "✅ quadra" : "❌ no quadra") },
     { k:"Curs", v: p.cursLabel || "—" },
     { k:"Convocatòria", v: p.any || "—" },

@@ -32,8 +32,16 @@
  *
  *   Errors (respostos i no resolts) = QQ − AA = nombre de '9' a R.
  *
- * El checksum es calcula sobre QQ+AA+PP+curs+dd+mm+hh+min+salt.charCodeAt(0),
- * de manera idèntica a l'analitzador (analitzador-cangur.html).
+ * LLETRA DE CONTROL (idèntica a l'analitzador, analitzador-cangur.html):
+ *   antiga (codis fins al 18/10/2026):
+ *     suma = QQ+AA+PP+curs+dd+mm+hh+min+salt.charCodeAt(0)
+ *   nova (des del 18/10/2026): la mateixa suma + Σ pes(i)·ASCII(cos[i]),
+ *     on cos = TTTTT + R i pes(i) = (i mod 22) + 1. Així també cobreix la
+ *     durada i cada xifra de R: canviar-ne una sola canvia sempre la lletra
+ *     (els pesos van de 1 a 22 i 23 és primer). Mateixa idea que
+ *     operacions/js/codi-verificacio.js.
+ *   L'analitzador accepta totes dues: la nova vol dir «resultats verificats»;
+ *   l'antiga, codi d'abans (o amb R o la durada canviats).
  */
 window.Codi = (function () {
   "use strict";
@@ -59,6 +67,18 @@ window.Codi = (function () {
 
   function checksumLetter(qq, aa, pp, cnum, dd, mm, hh, min, saltChar0) {
     const suma = qq + aa + pp + cnum + dd + mm + hh + min + saltChar0;
+    return LC.charAt(suma % 23);
+  }
+
+  // Suma ponderada del cos del codi (TTTTT + R): pesos 1..22.
+  function sumaCos(cos) {
+    let s = 0;
+    for (let i = 0; i < cos.length; i++) s += ((i % 22) + 1) * cos.charCodeAt(i);
+    return s;
+  }
+
+  function checksumLetterNova(qq, aa, pp, cnum, dd, mm, hh, min, saltChar0, cos) {
+    const suma = qq + aa + pp + cnum + dd + mm + hh + min + saltChar0 + sumaCos(cos);
     return LC.charAt(suma % 23);
   }
 
@@ -119,10 +139,11 @@ window.Codi = (function () {
     const pp = cap99(hints);
     const ttttt = pad(Math.max(0, Math.min(99999, Math.round(m.durationSec || 0))), 5);
 
-    const lletra = checksumLetter(
+    const lletra = checksumLetterNova(
       qq, aa, pp, cnum,
       parseInt(dd, 10), parseInt(mm, 10), parseInt(hh, 10), parseInt(min, 10),
-      salt.charCodeAt(0)
+      salt.charCodeAt(0),
+      ttttt + results
     );
 
     const code = `${lletra}${salt}-${dd}${mm}-${hh}${min}-${EX_CODE}-${cnum}-${pad(
@@ -182,13 +203,19 @@ window.Codi = (function () {
       pp = +p[7],
       dur = +p[8];
     const results = p[9];
-    const expected = checksumLetter(qq, aa, pp, cnum, dd, mm, hh, mn, salt.charCodeAt(0));
-    const checksumOk = expected === ltr;
+    const versio =
+      checksumLetterNova(qq, aa, pp, cnum, dd, mm, hh, mn, salt.charCodeAt(0), p[8] + results) === ltr
+        ? "nova"
+        : checksumLetter(qq, aa, pp, cnum, dd, mm, hh, mn, salt.charCodeAt(0)) === ltr
+          ? "antiga"
+          : null;
+    const checksumOk = versio !== null;
 
     return {
       format: "cg",
       valid: checksumOk,
       checksumOk,
+      resultatsVerificats: versio === "nova",
       exerciseCode: "CG",
       exercise: "cangur",
       curs: CHAR_CURS[cursChar] || null,

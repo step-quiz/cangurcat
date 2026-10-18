@@ -188,11 +188,14 @@ Codificació de cada xifra de `R`: `0` = no respost · `1`–`8` = resolt al
 N-è commit (`1` = a la primera) · `9` = respost però no resolt. Els
 **errors** són `QQ − AA` (= nombre de `9` a `R`).
 
-> El checksum es calcula sobre `QQ+AA+PP+curs+dd+mm+hh+min+salt[0]` (mòdul
-> 23). Igual que a Competències Bàsiques, **no cobreix la cadena `R`**; per
-> això l'analitzador fa una **verificació creuada** addicional (comprova
-> que els comptadors `QQ`/`AA` quadrin amb el detall per problema de `R`) i
-> marca com a invàlid qualsevol codi manipulat.
+> **Lletra de control.** Des del 18/10/2026 es calcula sobre
+> `QQ+AA+PP+curs+dd+mm+hh+min+salt[0]` **més una suma ponderada de `TTTTT` i
+> de cada xifra de `R`** (pesos 1–22, mòdul 23): canviar una sola xifra de la
+> durada o del detall per problema la fa deixar de quadrar. Els codis d'abans
+> només en cobrien els comptadors, la data i l'hora; l'analitzador els accepta
+> i els marca ☑️ (durada i detall sense verificar). A més, l'analitzador fa una
+> **verificació creuada** (els comptadors `QQ`/`AA` han de quadrar amb `R`).
+> La fórmula és a `js/codi.js` i, idèntica, a `analitzador-cangur.html`.
 
 ### Acumulació de la sessió
 
