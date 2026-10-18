@@ -1,0 +1,95 @@
+# Descomprimeix els ZIP que es pugen a _uploads/ i en desa el contingut a la
+# mateixa branca.
+#
+# Com ha de ser el ZIP: amb l'estructura de carpetes de l'arrel del
+# repositori (per exemple, assets/js/app.js), sense cap carpeta que ho
+# contingui tot. Es puja des de la web de GitHub: _uploads/ → Add file →
+# Upload files.
+#
+# Proteccions:
+#  · concurrency: si es pugen dos ZIP seguits, el segon espera que acabi el
+#    primer (abans l'últim a acabar podia esborrar la feina de l'altre).
+#  · El que hi hagi a .github/ dins del ZIP s'ignora (i es diu): GitHub no
+#    deixa que una Action modifiqui els workflows, i el push fallaria sencer.
+#    Els workflows es canvien des de la web de GitHub.
+#  · S'ignoren les carpetes __MACOSX/ i els fitxers .DS_Store del Mac.
+#  · Un ZIP trencat es treu de _uploads/ (perquè no bloquegi els següents),
+#    no se'n desa res i l'execució acaba en vermell amb el seu nom: cal tornar
+#    a generar-lo i pujar-lo.
+#  · El commit no porta «[skip ci]» ni cap etiqueta semblant: Cloudflare
+#    Pages no el publicaria.
+#  · També es pot llançar a mà: Actions → «Extract and commit zip uploads» →
+#    Run workflow (processa els ZIP que hi hagi a _uploads/).
+name: Extract and commit zip uploads
+
+on:
+  push:
+    paths:
+      - '_uploads/**.zip'
+      - '_uploads/**.ZIP'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: unzip-uploads-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # El que hi hagi hagut de nou mentre aquesta execució esperava el torn.
+      - name: Posa la branca al dia
+        run: git pull --ff-only origin "${GITHUB_REF_NAME}"
+
+      - name: Descomprimeix els ZIP de _uploads/
+        run: |
+          shopt -s nullglob nocaseglob
+          zips=(_uploads/*.zip)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "No hi ha cap ZIP a _uploads/."
+            exit 0
+          fi
+          for z in "${zips[@]}"; do
+            echo "::group::$z"
+            if unzip -Z1 "$z" 2>/dev/null | grep -q '^\.github/'; then
+              echo "::warning::$z porta fitxers de .github/: s'ignoren (els workflows es canvien des de la web de GitHub)."
+            fi
+            rc=0
+            unzip -o "$z" -d . -x '.github/*' '__MACOSX/*' '*.DS_Store' || rc=$?
+            # 0 = correcte; 1 = avisos, però s'ha descomprimit tot.
+            if [ "$rc" -gt 1 ]; then
+              echo "::error::No s'ha pogut descomprimir $z (codi $rc): es treu de _uploads/ sense desar-ne res. Torna a generar el ZIP i puja'l."
+              echo "$z" >> "$RUNNER_TEMP/zips-trencats.txt"
+            fi
+            rm -- "$z"
+            echo "::endgroup::"
+          done
+
+      - name: Desa els canvis
+        id: desa
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No hi ha res a desar."
+            exit 0
+          fi
+          git commit -q -m "Auto-extract uploaded zip"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "desat=true" >> "$GITHUB_OUTPUT"
+          git diff --name-only HEAD~1 HEAD | sed 's/^/  /'
+
+      - name: Comprova que cap ZIP no estigués trencat
+        run: |
+          if [ -s "$RUNNER_TEMP/zips-trencats.txt" ]; then
+            echo "::error::Aquests ZIP estaven trencats i no s'han aplicat: $(tr '\n' ' ' < "$RUNNER_TEMP/zips-trencats.txt")"
+            exit 1
+          fi
