@@ -449,7 +449,7 @@
         .join("");
       problemPicker = `
         <div class="field-label">Problema</div>
-        <select class="problem-select" data-role="problem-select">${opts}</select>
+        <select class="problem-select" data-role="problem-select" aria-label="Problema">${opts}</select>
         <button class="btn btn-start btn-full" data-action="start">🎯 Inicia el problema</button>`;
     }
 
