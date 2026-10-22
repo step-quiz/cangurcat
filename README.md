@@ -168,6 +168,31 @@ Google Form. És el mateix patró que el projecte de Competències Bàsiques.
 La lògica del codi viu a `js/codi.js` (font única de l'especificació, que
 **genera i descodifica** el codi amb la mateixa funció de control).
 
+### Pantalla final
+
+La pantalla **Prova finalitzada** mostra el curs i la convocatòria, **una frase de
+retorn** i el codi (clicar-lo el copia). No mostra cap comptador (respostes, encerts,
+errors, pistes): viatgen dins el codi i es veuen a l'analitzador. Tampoc enllaça el
+Google Form: el professorat diu a l'alumnat on lliurar el codi.
+
+La frase surt d'un banc de 10 (`feedbackFor` a `js/app.js`). Es miren en ordre i
+guanya la primera que encaixa. Com que la comprovació A–E no té límit d'intents, el
+criteri és quants problemes s'han encertat **a la primera** (`f`) sobre els respostos
+(`a`); `s` = resolts (a la primera o no), `h` = pistes.
+
+| # | Condició                                   | Frase (comença amb)                         |
+| - | ------------------------------------------ | ------------------------------------------- |
+| 1 | `a = 0`                                    | 👀 Has fet una ullada als problemes…         |
+| 2 | `f = a`, `h = 0`, `a ≥ 3`                  | 🌟 Impecable!…                               |
+| 3 | `f = a`, `h = 0` (1 o 2 respostos)         | 👍 Bon començament…                          |
+| 4 | `f = a`, amb pistes                        | 💡 Tot el que has respost, ho has encertat… |
+| 5 | `s = a` (tot resolt, algun amb més intents) | 💪 Has acabat resolent tots els problemes…   |
+| 6 | `a ≥ 15` i `f/a ≥ 0,5`                     | 🏃 Quina constància!…                        |
+| 7 | `f/a ≥ 0,7`                                | 🎯 Molt bona feina!…                         |
+| 8 | `f/a ≥ 0,4`                                | 📈 Bona feina…                               |
+| 9 | `s = 0`                                    | 🧭 Aquesta vegada no n'has resolt cap…       |
+| 10 | la resta                                  | 🧩 Alguns problemes te'ls has fet teus…      |
+
 ### Format del codi (`CG`, 10 segments)
 
 ```

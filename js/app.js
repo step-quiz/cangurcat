@@ -159,14 +159,57 @@
     }
     let answered = 0,
       solved = 0,
+      firstTry = 0,
       hints = 0;
     for (const k in merged) {
       const r = merged[k];
       if (r.answered) answered++;
       if (r.solved) solved++;
+      if (r.solveCommits === 1) firstTry++;
       hints += r.hints || 0;
     }
-    return { answered, solved, errors: answered - solved, hints, problems: merged };
+    return {
+      answered,
+      solved,
+      firstTry,
+      errors: answered - solved,
+      hints,
+      problems: merged,
+    };
+  }
+
+  // Banc de frases del retorn final. Se'n tria UNA segons com ha anat la
+  // sessió; es miren en ordre i guanya la primera que encaixa. Com que la
+  // comprovació A–E no té límit d'intents, el que de debò diu com ha anat
+  // és quants problemes s'han encertat A LA PRIMERA (no quants s'han resolt).
+  //   a = problemes respostos (amb almenys un intent)
+  //   s = resolts (a la primera o no) · f = resolts a la primera
+  //   h = pistes demanades
+  function feedbackFor(t) {
+    const a = t.answered,
+      s = t.solved,
+      f = t.firstTry,
+      h = t.hints;
+    const r = a > 0 ? f / a : 0;
+    if (a === 0)
+      return "👀 Has fet una ullada als problemes, però encara no n'has respost cap. La propera vegada tria'n un i atreveix-te a donar una resposta: equivocar-se també és aprendre.";
+    if (f === a && h === 0 && a >= 3)
+      return "🌟 Impecable! Tots els problemes que has respost, els has encertat a la primera i sense cap pista. Tens molt bon olfacte matemàtic.";
+    if (f === a && h === 0)
+      return "👍 Bon començament: el que has respost, ho has encertat a la primera. Ara prova d'encadenar-ne més!";
+    if (f === a)
+      return "💡 Tot el que has respost, ho has encertat a la primera, i has sabut fer servir les pistes quan les necessitaves. Saber demanar ajuda també és una habilitat.";
+    if (s === a)
+      return "💪 Has acabat resolent tots els problemes que has començat. Alguns t'han costat més d'un intent, però no t'has rendit: aquesta és l'actitud!";
+    if (a >= 15 && r >= 0.5)
+      return "🏃 Quina constància! Has treballat un munt de problemes i n'has encertat molts a la primera. Així és com s'entrena per al Cangur.";
+    if (r >= 0.7)
+      return "🎯 Molt bona feina! Has encertat a la primera la gran majoria dels problemes. Repassa els que se t'han resistit: segur que hi trobes el detall que se t'escapava.";
+    if (r >= 0.4)
+      return "📈 Bona feina: has encertat a la primera una bona part dels problemes. Amb una mica més de calma en llegir els enunciats, encara n'encertaràs més.";
+    if (s === 0)
+      return "🧭 Aquesta vegada no n'has resolt cap, però t'hi has posat. Rellegeix l'enunciat amb calma i fes-te un dibuix o un esquema: és la millor eina del Cangur.";
+    return "🧩 Alguns problemes te'ls has fet teus i d'altres se t'han resistit. Els problemes del Cangur demanen paciència: cada intent t'acosta a la solució.";
   }
 
   function humanitzeDur(sec) {
@@ -201,6 +244,7 @@
       problems: totals.problems,
       durationSec: Date.now() / 1000 - session.startedTs,
     });
+    lastCode.feedback = feedbackFor(totals);
     sessionFinished = true;
     menuOpen = false;
     render();
@@ -350,22 +394,18 @@
       </div>`;
   }
 
-  // Panell "Prova finalitzada": resum + codi copiable (com a Competències
-  // Bàsiques) + opcions per seguir practicant o començar de nou.
+  // Panell "Prova finalitzada": frase de retorn + codi copiable (com a
+  // Competències Bàsiques) + opcions per seguir practicant o començar de nou.
+  // Els comptadors (encerts, errors, pistes) NO es mostren a l'alumne:
+  // viatgen dins el codi i es veuen a l'analitzador.
   function renderFinishedPanel() {
     const m = lastCode.metrics;
     return `
       <section class="finished-panel">
         <div class="finished-title">🎉 Prova finalitzada</div>
-        <p class="finished-sub">Has completat la pràctica de:
-          <strong>${esc(m.cursLabel)}</strong> · convocatòria <strong>${m.any}</strong></p>
+        <p class="finished-sub">Prova Cangur de <strong>${esc(m.cursLabel)}</strong> · convocatòria <strong>${m.any}</strong></p>
 
-        <div class="finished-stats">
-          <div class="fs-item"><div class="fs-num">${m.answered}</div><div class="fs-lbl">respostes</div></div>
-          <div class="fs-item"><div class="fs-num">${m.solved}</div><div class="fs-lbl">encerts</div></div>
-          <div class="fs-item"><div class="fs-num">${m.errors}</div><div class="fs-lbl">errors</div></div>
-          <div class="fs-item"><div class="fs-num">${m.hints}</div><div class="fs-lbl">pistes</div></div>
-        </div>
+        <p class="finished-feedback">${esc(lastCode.feedback)}</p>
 
         <div class="code-box">
           <p class="code-box-label">Clica damunt del codi següent:</p>
@@ -375,18 +415,12 @@
           <div class="copied-msg" data-role="copied-msg">Copiat! ✅</div>
         </div>
 
-        <div class="code-box" data-role="forms-box" style="display:none">
-          <p class="code-box-label">Clica l'enllaç següent per obrir el Google Forms:</p>
-          <a class="btn btn-start btn-full" href="https://docs.google.com/forms/d/e/1FAIpQLSfGul0XzwH_SiJ8Vr8kOe_J5pHNFCohSk1tW1dpz8GZuB7f_Q/viewform" target="_blank" rel="noopener noreferrer">Enquesta</a>
-        </div>
-
         <div class="finished-actions">
           <button class="btn btn-continue" data-action="continue-practice">↩︎ Seguir practicant</button>
           <button class="btn btn-newsession" data-action="new-session">🔄 Començar una sessió nova</button>
         </div>
       </section>`;
   }
-
 
   function renderSelector() {
     const open = !state ? "open" : "";
@@ -842,11 +876,6 @@
 
   // Copia el codi de verificació al porta-retalls amb feedback visual.
   function copyCode(btn, code) {
-    // En clicar el codi, mostra la bombolla amb l'enllaç al Google Forms.
-    // (Es revela sempre, encara que la còpia al porta-retalls falli.)
-    const fb = root.querySelector('[data-role="forms-box"]');
-    if (fb) fb.style.display = "";
-
     const done = () => {
       btn.classList.add("copied");
       const msg = btn.parentElement.querySelector('[data-role="copied-msg"]');
